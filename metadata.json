@@ -1,0 +1,8 @@
+{
+  "name": "Remix  Image of Christ Bible College | Vellore",
+  "description": "Official website of Image of Christ Bible College, Vellore. Equipping servant-leaders with sound biblical doctrine, pastoral formation, and spiritual maturity.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
