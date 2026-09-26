@@ -84,7 +84,7 @@ export const DocumentModal: React.FC = () => {
                   </li>
                   <li className="flex items-center">
                     <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 mr-2 flex-shrink-0" />
-                    Meets Asia Theological Association (ATA) curricular framework guidelines
+                    Rooted in sound biblical doctrine and practical ministry formation
                   </li>
                   <li className="flex items-center">
                     <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 mr-2 flex-shrink-0" />

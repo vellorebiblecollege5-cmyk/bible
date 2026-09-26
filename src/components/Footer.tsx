@@ -278,57 +278,31 @@ export const Footer: React.FC = () => {
           </div>
         </div>
 
-        {/* Accreditation & Institutional statement */}
-        <div className="mt-12 pt-8 border-t border-slate-800 text-xs text-slate-400 space-y-4">
-          <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center space-x-3">
-              <Shield className="w-6 h-6 text-amber-500 flex-shrink-0" />
-              <div>
-                <span className="font-semibold text-slate-200">Theological Adherence:</span>
-                <span className="ml-1 text-slate-400">
-                  {COLLEGE_INFO.affiliation}. Committed to historic evangelical orthodoxy and the Great Commission.
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4 flex-shrink-0">
-              <button
-                onClick={() => navigateTo('about')}
-                className="text-amber-400 hover:underline cursor-pointer"
-              >
-                Statement of Faith
-              </button>
-              <span>•</span>
-              <button
-                onClick={() => navigateTo('login-user')}
-                className="text-slate-300 hover:text-amber-400 cursor-pointer"
-              >
-                User Login
-              </button>
-              <span>•</span>
-              <button
-                onClick={() => navigateTo('login-admin')}
-                className="text-slate-300 hover:text-amber-400 cursor-pointer"
-              >
-                Admin Login
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
+        {/* Bottom bar */}
+        <div className="mt-12 pt-8 border-t border-slate-800 text-xs text-slate-400">
+          <div className="flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-3">
             <div>
               © {new Date().getFullYear()} Image of Christ Bible College (ICBC), Vellore, Tamil Nadu. All rights reserved.
             </div>
-            <div className="flex items-center space-x-4">
-              <button onClick={() => navigateTo('contact')} className="hover:text-amber-400">
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button onClick={() => navigateTo('about')} className="text-amber-400 hover:underline cursor-pointer">
+                Statement of Faith
+              </button>
+              <span>|</span>
+              <button onClick={() => navigateTo('contact')} className="hover:text-amber-400 cursor-pointer">
                 Contact Office
               </button>
               <span>|</span>
-              <button onClick={() => navigateTo('downloads')} className="hover:text-amber-400">
+              <button onClick={() => navigateTo('downloads')} className="hover:text-amber-400 cursor-pointer">
                 Forms & Syllabi
               </button>
               <span>|</span>
-              <button onClick={() => navigateTo('students-login')} className="hover:text-amber-400">
-                Student Access
+              <button onClick={() => navigateTo('login-user')} className="text-slate-300 hover:text-amber-400 cursor-pointer">
+                User Login
+              </button>
+              <span>|</span>
+              <button onClick={() => navigateTo('login-admin')} className="text-slate-300 hover:text-amber-400 cursor-pointer">
+                Admin Login
               </button>
             </div>
           </div>

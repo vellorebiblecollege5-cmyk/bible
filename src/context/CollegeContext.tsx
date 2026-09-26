@@ -84,6 +84,9 @@ interface CollegeContextType {
   setLoginMode: (mode: 'user' | 'admin') => void;
   courses: Course[];
   faculty: FacultyMember[];
+  addFaculty: (member: Omit<FacultyMember, 'id'>) => Promise<void>;
+  updateFaculty: (id: string, updates: Partial<FacultyMember>) => Promise<void>;
+  deleteFaculty: (id: string) => Promise<void>;
   // Student Portal
   studentProfile: StudentProfile | null;
   isStudentLoggedIn: boolean;
@@ -93,8 +96,11 @@ interface CollegeContextType {
   studentsList: StudentProfile[];
   addStudent: (student: StudentProfile) => Promise<void>;
   updateStudent: (id: string, updates: Partial<StudentProfile>) => Promise<void>;
+  deleteStudent: (id: string) => Promise<void>;
   subjectsList: SubjectItem[];
   addSubject: (subject: SubjectItem) => Promise<void>;
+  updateSubject: (id: string, updates: Partial<SubjectItem>) => Promise<void>;
+  deleteSubject: (id: string) => Promise<void>;
   // Supabase Auth State (STEP 3)
   currentUser: AppUser | null;
   currentAuthRole: UserRole | null;
@@ -107,26 +113,43 @@ interface CollegeContextType {
   // Storage & Files (STEP 4)
   uploadedFiles: UploadedStorageFile[];
   uploadFileToStorage: (bucket: StorageBucket, file: File) => Promise<{ url: string; error?: string }>;
+  addUploadedFileManual: (file: UploadedStorageFile) => void;
+  updateUploadedFile: (index: number, updates: Partial<UploadedStorageFile>) => void;
+  deleteUploadedFile: (index: number) => void;
   // Content & Admissions
   studyMaterials: StudyMaterial[];
   addStudyMaterial: (material: Omit<StudyMaterial, 'id' | 'uploadedDate'>) => Promise<void>;
+  updateStudyMaterial: (id: string, updates: Partial<StudyMaterial>) => Promise<void>;
+  deleteStudyMaterial: (id: string) => Promise<void>;
   notices: Notice[];
   addNotice: (notice: Omit<Notice, 'id' | 'date'>) => Promise<void>;
+  updateNotice: (id: string, updates: Partial<Notice>) => Promise<void>;
   deleteNotice: (id: string) => Promise<void>;
   events: EventItem[];
   addEvent: (ev: Omit<EventItem, 'id'>) => Promise<void>;
+  updateEvent: (id: string, updates: Partial<EventItem>) => Promise<void>;
+  deleteEvent: (id: string) => Promise<void>;
   gallery: GalleryPhoto[];
   addGalleryPhoto: (photo: Omit<GalleryPhoto, 'id'>) => Promise<void>;
+  updateGalleryPhoto: (id: string, updates: Partial<GalleryPhoto>) => Promise<void>;
   deleteGalleryPhoto: (id: string) => Promise<void>;
   addCourse: (course: Course) => Promise<void>;
+  updateCourse: (id: string, updates: Partial<Course>) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
   downloads: DownloadDoc[];
+  addDownload: (doc: Omit<DownloadDoc, 'id' | 'updatedAt' | 'downloadCount'>) => Promise<void>;
+  updateDownload: (id: string, updates: Partial<DownloadDoc>) => Promise<void>;
+  deleteDownload: (id: string) => Promise<void>;
   recordDownload: (id: string) => void;
   applications: ApplicationSubmission[];
   submitApplication: (app: Omit<ApplicationSubmission, 'id' | 'applicationNo' | 'submittedAt' | 'status'>) => Promise<string>;
+  updateApplication: (id: string, updates: Partial<ApplicationSubmission>) => Promise<void>;
   updateApplicationStatus: (id: string, status: ApplicationSubmission['status'], notes?: string) => Promise<void>;
+  deleteApplication: (id: string) => Promise<void>;
   contactMessages: ContactMessage[];
   submitContactMessage: (msg: Omit<ContactMessage, 'id' | 'date' | 'status'>) => Promise<void>;
+  updateContactMessage: (id: string, updates: Partial<ContactMessage>) => Promise<void>;
+  deleteContactMessage: (id: string) => Promise<void>;
   markMessageAnswered: (id: string) => Promise<void>;
   selectedCourseForApply: string | null;
   setSelectedCourseForApply: (courseId: string | null) => void;
@@ -150,6 +173,8 @@ const STORAGE_KEYS = {
   STUDENTS: 'icbc_students_v2',
   SUBJECTS: 'icbc_subjects_v2',
   COURSES: 'icbc_courses_v2',
+  FACULTY: 'icbc_faculty_v2',
+  DOWNLOADS: 'icbc_downloads_v2',
   GALLERY: 'icbc_gallery_v3',
   UPLOADED_FILES: 'icbc_uploaded_files_v2',
   AUTH_USER: 'icbc_auth_user_v2',
@@ -215,12 +240,18 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const saved = localStorage.getItem(STORAGE_KEYS.COURSES);
     return saved ? JSON.parse(saved) : INITIAL_COURSES;
   });
-  const [faculty] = useState<FacultyMember[]>(INITIAL_FACULTY);
+  const [faculty, setFaculty] = useState<FacultyMember[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.FACULTY);
+    return saved ? JSON.parse(saved) : INITIAL_FACULTY;
+  });
   const [gallery, setGallery] = useState<GalleryPhoto[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.GALLERY);
     return saved ? JSON.parse(saved) : INITIAL_GALLERY;
   });
-  const [downloads, setDownloads] = useState<DownloadDoc[]>(INITIAL_DOWNLOADS);
+  const [downloads, setDownloads] = useState<DownloadDoc[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.DOWNLOADS);
+    return saved ? JSON.parse(saved) : INITIAL_DOWNLOADS;
+  });
 
   const [studentsList, setStudentsList] = useState<StudentProfile[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.STUDENTS);
@@ -317,6 +348,14 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(courses));
   }, [courses]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.FACULTY, JSON.stringify(faculty));
+  }, [faculty]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.DOWNLOADS, JSON.stringify(downloads));
+  }, [downloads]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.GALLERY, JSON.stringify(gallery));
@@ -562,6 +601,81 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return { url: fallbackUrl };
   };
 
+  const addUploadedFileManual = (file: UploadedStorageFile) => {
+    setUploadedFiles(prev => [file, ...prev]);
+  };
+
+  const updateUploadedFile = (index: number, updates: Partial<UploadedStorageFile>) => {
+    setUploadedFiles(prev => prev.map((f, i) => (i === index ? { ...f, ...updates } : f)));
+  };
+
+  const deleteUploadedFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Faculty management
+  const addFaculty = async (member: Omit<FacultyMember, 'id'>) => {
+    const id = `fac-${Date.now()}`;
+    const newMember: FacultyMember = { ...member, id };
+    setFaculty(prev => [newMember, ...prev]);
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('faculty').insert({
+          id,
+          name: newMember.name,
+          designation: newMember.role,
+          department: newMember.department,
+          qualification: newMember.degrees,
+          alma_mater: newMember.almaMater,
+          years_of_experience: newMember.yearsOfExperience,
+          bio: newMember.bio,
+          subjects: newMember.subjects,
+          profile_image: newMember.photo,
+          quote: newMember.quote || '',
+          status: 'Active'
+        });
+      } catch (e) {
+        console.warn('Failed to insert faculty into Supabase:', e);
+      }
+    }
+  };
+
+  const updateFaculty = async (id: string, updates: Partial<FacultyMember>) => {
+    setFaculty(prev => prev.map(f => (f.id === id ? { ...f, ...updates } : f)));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('faculty').update({
+          ...(updates.name ? { name: updates.name } : {}),
+          ...(updates.role ? { designation: updates.role } : {}),
+          ...(updates.department ? { department: updates.department } : {}),
+          ...(updates.degrees ? { qualification: updates.degrees } : {}),
+          ...(updates.almaMater ? { alma_mater: updates.almaMater } : {}),
+          ...(updates.yearsOfExperience !== undefined ? { years_of_experience: updates.yearsOfExperience } : {}),
+          ...(updates.bio ? { bio: updates.bio } : {}),
+          ...(updates.subjects ? { subjects: updates.subjects } : {}),
+          ...(updates.photo ? { profile_image: updates.photo } : {}),
+          ...(updates.quote !== undefined ? { quote: updates.quote } : {})
+        }).eq('id', id);
+      } catch (e) {
+        console.warn('Failed to update faculty in Supabase:', e);
+      }
+    }
+  };
+
+  const deleteFaculty = async (id: string) => {
+    setFaculty(prev => prev.filter(f => f.id !== id));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('faculty').delete().eq('id', id);
+      } catch (e) {
+        console.warn('Failed to delete faculty in Supabase:', e);
+      }
+    }
+  };
+
   // Student & Subject management
   const addStudent = async (student: StudentProfile) => {
     setStudentsList(prev => [student, ...prev]);
@@ -594,9 +708,33 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const client = getSupabaseClient();
     if (client) {
       try {
-        await client.from('students').update(updates).eq('id', id);
+        await client.from('students').update({
+          ...(updates.regNo ? { student_id: updates.regNo } : {}),
+          ...(updates.name ? { full_name: updates.name } : {}),
+          ...(updates.email ? { email: updates.email } : {}),
+          ...(updates.phone ? { phone: updates.phone } : {}),
+          ...(updates.courseId ? { course_id: updates.courseId } : {}),
+          ...(updates.courseTitle ? { course_title: updates.courseTitle } : {}),
+          ...(updates.currentYear ? { admission_year: updates.currentYear } : {}),
+          ...(updates.batch ? { batch: updates.batch } : {}),
+          ...(updates.avatar ? { profile_image: updates.avatar } : {}),
+          ...(updates.attendancePercent !== undefined ? { attendance_percent: updates.attendancePercent } : {}),
+          ...(updates.gpa ? { gpa: updates.gpa } : {})
+        }).eq('id', id);
       } catch (e) {
         console.warn('Failed to update student in Supabase:', e);
+      }
+    }
+  };
+
+  const deleteStudent = async (id: string) => {
+    setStudentsList(prev => prev.filter(s => s.id !== id));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('students').delete().eq('id', id);
+      } catch (e) {
+        console.warn('Failed to delete student in Supabase:', e);
       }
     }
   };
@@ -617,6 +755,37 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
       } catch (e) {
         console.warn('Failed to insert subject into Supabase:', e);
+      }
+    }
+  };
+
+  const updateSubject = async (id: string, updates: Partial<SubjectItem>) => {
+    setSubjectsList(prev => prev.map(s => (s.id === id ? { ...s, ...updates } : s)));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('subjects').update({
+          ...(updates.courseId ? { course_id: updates.courseId } : {}),
+          ...(updates.subjectCode ? { subject_code: updates.subjectCode } : {}),
+          ...(updates.subjectName ? { subject_name: updates.subjectName } : {}),
+          ...(updates.credits !== undefined ? { credits: updates.credits } : {}),
+          ...(updates.semesterOrYear ? { semester_or_year: updates.semesterOrYear } : {}),
+          ...(updates.facultyName ? { faculty_name: updates.facultyName } : {})
+        }).eq('id', id);
+      } catch (e) {
+        console.warn('Failed to update subject in Supabase:', e);
+      }
+    }
+  };
+
+  const deleteSubject = async (id: string) => {
+    setSubjectsList(prev => prev.filter(s => s.id !== id));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('subjects').delete().eq('id', id);
+      } catch (e) {
+        console.warn('Failed to delete subject in Supabase:', e);
       }
     }
   };
@@ -941,7 +1110,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return { success: true, message: 'Configuration saved and sync attempted.' };
   };
 
-  // Add Study Material
+  // Study Materials CRUD
   const addStudyMaterial = async (material: Omit<StudyMaterial, 'id' | 'uploadedDate'>) => {
     const id = `mat-${Date.now()}`;
     const date = new Date().toISOString().split('T')[0];
@@ -975,7 +1144,40 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Notices
+  const updateStudyMaterial = async (id: string, updates: Partial<StudyMaterial>) => {
+    setStudyMaterials(prev => prev.map(m => (m.id === id ? { ...m, ...updates } : m)));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('study_materials').update({
+          ...(updates.title ? { title: updates.title } : {}),
+          ...(updates.courseName ? { course_name: updates.courseName } : {}),
+          ...(updates.subject ? { subject: updates.subject } : {}),
+          ...(updates.facultyName ? { faculty_name: updates.facultyName } : {}),
+          ...(updates.type ? { type: updates.type } : {}),
+          ...(updates.fileSize ? { file_size: updates.fileSize } : {}),
+          ...(updates.downloadUrl !== undefined ? { file_url: updates.downloadUrl } : {}),
+          ...(updates.description !== undefined ? { description: updates.description } : {})
+        }).eq('id', id);
+      } catch (err) {
+        console.warn('Could not update study material in Supabase:', err);
+      }
+    }
+  };
+
+  const deleteStudyMaterial = async (id: string) => {
+    setStudyMaterials(prev => prev.filter(m => m.id !== id));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('study_materials').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Could not delete study material from Supabase:', err);
+      }
+    }
+  };
+
+  // Notices CRUD
   const addNotice = async (notice: Omit<Notice, 'id' | 'date'>) => {
     const id = `not-${Date.now()}`;
     const date = new Date().toISOString().split('T')[0];
@@ -1004,6 +1206,24 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const updateNotice = async (id: string, updates: Partial<Notice>) => {
+    setNotices(prev => prev.map(n => (n.id === id ? { ...n, ...updates } : n)));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('notices').update({
+          ...(updates.title ? { title: updates.title } : {}),
+          ...(updates.category ? { category: updates.category } : {}),
+          ...(updates.isUrgent !== undefined ? { is_urgent: Boolean(updates.isUrgent) } : {}),
+          ...(updates.content ? { content: updates.content } : {}),
+          ...(updates.postedBy ? { posted_by: updates.postedBy } : {})
+        }).eq('id', id);
+      } catch (e) {
+        console.warn('Could not update notice in Supabase:', e);
+      }
+    }
+  };
+
   const deleteNotice = async (id: string) => {
     setNotices(prev => prev.filter(n => n.id !== id));
     const client = getSupabaseClient();
@@ -1016,7 +1236,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Events
+  // Events CRUD
   const addEvent = async (ev: Omit<EventItem, 'id'>) => {
     const id = `ev-${Date.now()}`;
     const newEvent: EventItem = { ...ev, id };
@@ -1043,6 +1263,40 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const updateEvent = async (id: string, updates: Partial<EventItem>) => {
+    setEvents(prev => prev.map(ev => (ev.id === id ? { ...ev, ...updates } : ev)));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('events').update({
+          ...(updates.title ? { title: updates.title } : {}),
+          ...(updates.date ? { date: updates.date } : {}),
+          ...(updates.time ? { time: updates.time } : {}),
+          ...(updates.location ? { location: updates.location } : {}),
+          ...(updates.speaker ? { speaker: updates.speaker } : {}),
+          ...(updates.category ? { category: updates.category } : {}),
+          ...(updates.description !== undefined ? { description: updates.description } : {}),
+          ...(updates.image ? { image_url: updates.image } : {}),
+          ...(updates.registrationOpen !== undefined ? { registration_open: updates.registrationOpen } : {})
+        }).eq('id', id);
+      } catch (err) {
+        console.warn('Could not update event in Supabase:', err);
+      }
+    }
+  };
+
+  const deleteEvent = async (id: string) => {
+    setEvents(prev => prev.filter(ev => ev.id !== id));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('events').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Could not delete event from Supabase:', err);
+      }
+    }
+  };
+
   // Gallery Management (Immediately saved to Supabase & Live in User Site)
   const addGalleryPhoto = async (photo: Omit<GalleryPhoto, 'id'>) => {
     const id = `gal-${Date.now()}`;
@@ -1061,6 +1315,23 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
       } catch (err) {
         console.warn('Could not save gallery photo to Supabase:', err);
+      }
+    }
+  };
+
+  const updateGalleryPhoto = async (id: string, updates: Partial<GalleryPhoto>) => {
+    setGallery(prev => prev.map(g => (g.id === id ? { ...g, ...updates } : g)));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('gallery').update({
+          ...(updates.title ? { title: updates.title } : {}),
+          ...(updates.category ? { category: updates.category } : {}),
+          ...(updates.image ? { image_url: updates.image } : {}),
+          ...(updates.caption !== undefined ? { caption: updates.caption } : {})
+        }).eq('id', id);
+      } catch (err) {
+        console.warn('Could not update gallery photo in Supabase:', err);
       }
     }
   };
@@ -1103,6 +1374,29 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const updateCourse = async (id: string, updates: Partial<Course>) => {
+    setCourses(prev => prev.map(c => (c.id === id ? { ...c, ...updates } : c)));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('courses').update({
+          ...(updates.code ? { course_code: updates.code } : {}),
+          ...(updates.title ? { course_name: updates.title } : {}),
+          ...(updates.level ? { level: updates.level } : {}),
+          ...(updates.duration ? { duration: updates.duration } : {}),
+          ...(updates.mode ? { mode: updates.mode } : {}),
+          ...(updates.language ? { language: updates.language } : {}),
+          ...(updates.description !== undefined ? { description: updates.description } : {}),
+          ...(updates.eligibility !== undefined ? { eligibility: updates.eligibility } : {}),
+          ...(updates.totalCredits !== undefined ? { total_credits: updates.totalCredits } : {}),
+          ...(updates.annualTuition !== undefined ? { annual_tuition: updates.annualTuition } : {})
+        }).eq('id', id);
+      } catch (err) {
+        console.warn('Could not update course in Supabase:', err);
+      }
+    }
+  };
+
   const deleteCourse = async (id: string) => {
     setCourses(prev => prev.filter(c => c.id !== id));
     const client = getSupabaseClient();
@@ -1115,7 +1409,28 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Downloads counter
+  // Downloads CRUD & counter
+  const addDownload = async (doc: Omit<DownloadDoc, 'id' | 'updatedAt' | 'downloadCount'>) => {
+    const id = `dl-${Date.now()}`;
+    const updatedAt = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    const newDoc: DownloadDoc = {
+      ...doc,
+      id,
+      updatedAt,
+      downloadCount: 0
+    };
+    setDownloads(prev => [newDoc, ...prev]);
+  };
+
+  const updateDownload = async (id: string, updates: Partial<DownloadDoc>) => {
+    const updatedAt = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    setDownloads(prev => prev.map(d => (d.id === id ? { ...d, ...updates, updatedAt } : d)));
+  };
+
+  const deleteDownload = async (id: string) => {
+    setDownloads(prev => prev.filter(d => d.id !== id));
+  };
+
   const recordDownload = (id: string) => {
     setDownloads(prev =>
       prev.map(d => (d.id === id ? { ...d, downloadCount: d.downloadCount + 1 } : d))
@@ -1176,6 +1491,33 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return appNo;
   };
 
+  const updateApplication = async (id: string, updates: Partial<ApplicationSubmission>) => {
+    setApplications(prev => prev.map(a => (a.id === id ? { ...a, ...updates } : a)));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('admissions').update({
+          ...(updates.fullName ? { full_name: updates.fullName } : {}),
+          ...(updates.email ? { email: updates.email } : {}),
+          ...(updates.phone ? { phone: updates.phone } : {}),
+          ...(updates.dateOfBirth !== undefined ? { date_of_birth: updates.dateOfBirth } : {}),
+          ...(updates.gender ? { gender: updates.gender } : {}),
+          ...(updates.courseId ? { course_id: updates.courseId } : {}),
+          ...(updates.previousEducation !== undefined ? { previous_education: updates.previousEducation } : {}),
+          ...(updates.homeChurch !== undefined ? { home_church: updates.homeChurch } : {}),
+          ...(updates.pastorName !== undefined ? { pastor_name: updates.pastorName } : {}),
+          ...(updates.pastorPhone !== undefined ? { pastor_phone: updates.pastorPhone } : {}),
+          ...(updates.personalTestimony !== undefined ? { personal_testimony: updates.personalTestimony } : {}),
+          ...(updates.ministryCalling !== undefined ? { ministry_calling: updates.ministryCalling } : {}),
+          ...(updates.status ? { status: updates.status } : {}),
+          ...(updates.notes !== undefined ? { notes: updates.notes } : {})
+        }).eq('id', id);
+      } catch (err) {
+        console.warn('Supabase application full update failed:', err);
+      }
+    }
+  };
+
   const updateApplicationStatus = async (
     id: string,
     status: ApplicationSubmission['status'],
@@ -1191,6 +1533,18 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         await client.from('admissions').update({ status, notes }).eq('id', id);
       } catch (err) {
         console.warn('Supabase application update failed:', err);
+      }
+    }
+  };
+
+  const deleteApplication = async (id: string) => {
+    setApplications(prev => prev.filter(a => a.id !== id));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('admissions').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Supabase application delete failed:', err);
       }
     }
   };
@@ -1218,6 +1572,30 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const updateContactMessage = async (id: string, updates: Partial<ContactMessage>) => {
+    setContactMessages(prev => prev.map(m => (m.id === id ? { ...m, ...updates } : m)));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('contact_messages').update(updates).eq('id', id);
+      } catch (err) {
+        console.warn('Contact message Supabase update:', err);
+      }
+    }
+  };
+
+  const deleteContactMessage = async (id: string) => {
+    setContactMessages(prev => prev.filter(m => m.id !== id));
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await client.from('contact_messages').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Contact message Supabase delete:', err);
+      }
+    }
+  };
+
   const markMessageAnswered = async (id: string) => {
     setContactMessages(prev =>
       prev.map(m => (m.id === id ? { ...m, status: 'Prayed / Answered' } : m))
@@ -1233,6 +1611,9 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setLoginMode,
         courses,
         faculty,
+        addFaculty,
+        updateFaculty,
+        deleteFaculty,
         studentProfile,
         isStudentLoggedIn,
         loginStudent,
@@ -1240,8 +1621,11 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         studentsList,
         addStudent,
         updateStudent,
+        deleteStudent,
         subjectsList,
         addSubject,
+        updateSubject,
+        deleteSubject,
         currentUser,
         currentAuthRole,
         authLoading,
@@ -1252,25 +1636,42 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         logout,
         uploadedFiles,
         uploadFileToStorage,
+        addUploadedFileManual,
+        updateUploadedFile,
+        deleteUploadedFile,
         studyMaterials,
         addStudyMaterial,
+        updateStudyMaterial,
+        deleteStudyMaterial,
         notices,
         addNotice,
+        updateNotice,
         deleteNotice,
         events,
         addEvent,
+        updateEvent,
+        deleteEvent,
         gallery,
         addGalleryPhoto,
+        updateGalleryPhoto,
         deleteGalleryPhoto,
         addCourse,
+        updateCourse,
         deleteCourse,
         downloads,
+        addDownload,
+        updateDownload,
+        deleteDownload,
         recordDownload,
         applications,
         submitApplication,
+        updateApplication,
         updateApplicationStatus,
+        deleteApplication,
         contactMessages,
         submitContactMessage,
+        updateContactMessage,
+        deleteContactMessage,
         markMessageAnswered,
         selectedCourseForApply,
         setSelectedCourseForApply,

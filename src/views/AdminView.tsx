@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useCollege } from '../context/CollegeContext';
-import { ApplicationSubmission, UserRole, StorageBucket } from '../types';
+import {
+  ApplicationSubmission,
+  UserRole,
+  StorageBucket,
+  StudentProfile,
+  FacultyMember,
+  Course,
+  SubjectItem,
+  Notice,
+  StudyMaterial,
+  EventItem,
+  GalleryPhoto,
+  DownloadDoc,
+  ContactMessage
+} from '../types';
 import { LiquidCooledServerWidget } from '../components/LiquidCooledServerWidget';
 import { useTheme } from '../context/ThemeContext';
 import { useLiquidCooling } from '../context/LiquidCoolingContext';
@@ -21,6 +35,9 @@ import {
   MessageSquare,
   Plus,
   Trash2,
+  Edit3,
+  Image as ImageIcon,
+  Download,
   ExternalLink,
   CheckCircle2,
   Sparkles,
@@ -56,23 +73,51 @@ export const AdminView: React.FC = () => {
     loginMode,
     setLoginMode,
     applications,
+    submitApplication,
+    updateApplication,
     updateApplicationStatus,
+    deleteApplication,
     notices,
     addNotice,
+    updateNotice,
     deleteNotice,
     events,
     addEvent,
+    updateEvent,
+    deleteEvent,
     studyMaterials,
     addStudyMaterial,
+    updateStudyMaterial,
+    deleteStudyMaterial,
+    gallery,
+    addGalleryPhoto,
+    updateGalleryPhoto,
+    deleteGalleryPhoto,
+    downloads,
+    addDownload,
+    updateDownload,
+    deleteDownload,
     contactMessages,
+    submitContactMessage,
+    updateContactMessage,
+    deleteContactMessage,
     markMessageAnswered,
     studentsList,
     addStudent,
     updateStudent,
+    deleteStudent,
     subjectsList,
     addSubject,
+    updateSubject,
+    deleteSubject,
     courses,
+    addCourse,
+    updateCourse,
+    deleteCourse,
     faculty,
+    addFaculty,
+    updateFaculty,
+    deleteFaculty,
     currentUser,
     currentAuthRole,
     loginWithPin,
@@ -86,6 +131,9 @@ export const AdminView: React.FC = () => {
     logout,
     uploadedFiles,
     uploadFileToStorage,
+    addUploadedFileManual,
+    updateUploadedFile,
+    deleteUploadedFile,
     supabaseStatus,
     updateSupabaseCredentials,
     syncWithSupabase,
@@ -125,6 +173,8 @@ export const AdminView: React.FC = () => {
     | 'notices'
     | 'materials'
     | 'events'
+    | 'gallery'
+    | 'downloads'
     | 'storage'
     | 'supabase'
     | 'users'
@@ -149,42 +199,110 @@ export const AdminView: React.FC = () => {
   const [seedingSupabase, setSeedingSupabase] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
 
-  // Filter & Inspection state
+  // Filter & Inspection state (Admissions)
   const [appSearch, setAppSearch] = useState('');
   const [appCourseFilter, setAppCourseFilter] = useState('All');
   const [appStatusFilter, setAppStatusFilter] = useState('All');
   const [inspectedApp, setInspectedApp] = useState<ApplicationSubmission | null>(null);
+  const [showAppModal, setShowAppModal] = useState(false);
+  const [editingAppId, setEditingAppId] = useState<string | null>(null);
+  const [appFormName, setAppFormName] = useState('');
+  const [appFormEmail, setAppFormEmail] = useState('');
+  const [appFormPhone, setAppFormPhone] = useState('');
+  const [appFormDob, setAppFormDob] = useState('');
+  const [appFormGender, setAppFormGender] = useState('Male');
+  const [appFormCourseId, setAppFormCourseId] = useState('bth');
+  const [appFormEducation, setAppFormEducation] = useState('');
+  const [appFormChurch, setAppFormChurch] = useState('');
+  const [appFormPastor, setAppFormPastor] = useState('');
+  const [appFormPastorPhone, setAppFormPastorPhone] = useState('');
+  const [appFormTestimony, setAppFormTestimony] = useState('');
+  const [appFormCalling, setAppFormCalling] = useState('');
+  const [appFormStatus, setAppFormStatus] = useState<ApplicationSubmission['status']>('Under Review');
 
   // Storage Uploader State
   const [selectedBucket, setSelectedBucket] = useState<StorageBucket>('study-materials');
   const [isUploading, setIsUploading] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [editingFileIndex, setEditingFileIndex] = useState<number | null>(null);
+  const [fileFormName, setFileFormName] = useState('');
+  const [fileFormUrl, setFileFormUrl] = useState('');
+  const [fileFormSize, setFileFormSize] = useState('1.2 MB');
+  const [showAddFileModal, setShowAddFileModal] = useState(false);
 
-  // New Student modal / state
+  // Student modal / state (Add & Edit)
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [newStdRegNo, setNewStdRegNo] = useState('');
   const [newStdName, setNewStdName] = useState('');
   const [newStdEmail, setNewStdEmail] = useState('');
   const [newStdPhone, setNewStdPhone] = useState('');
   const [newStdCourse, setNewStdCourse] = useState('bth');
   const [newStdYear, setNewStdYear] = useState('Year 1 (Semester I)');
+  const [newStdBatch, setNewStdBatch] = useState('Batch of 2026–2029');
+  const [newStdGpa, setNewStdGpa] = useState('3.80 / 4.0');
+  const [newStdAttendance, setNewStdAttendance] = useState(95);
+  const [newStdAvatar, setNewStdAvatar] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80');
 
-  // New Notice form
+  // Faculty modal / state (Add & Edit)
+  const [showFacultyModal, setShowFacultyModal] = useState(false);
+  const [editingFacultyId, setEditingFacultyId] = useState<string | null>(null);
+  const [facName, setFacName] = useState('');
+  const [facRole, setFacRole] = useState('Professor of Theology');
+  const [facDept, setFacDept] = useState('Department of Biblical & Theological Studies');
+  const [facDegrees, setFacDegrees] = useState('M.Div., M.Th.');
+  const [facAlmaMater, setFacAlmaMater] = useState('Senate of Serampore / ATA');
+  const [facExp, setFacExp] = useState(10);
+  const [facSubjects, setFacSubjects] = useState('Systematic Theology, Homiletics');
+  const [facBio, setFacBio] = useState('');
+  const [facQuote, setFacQuote] = useState('');
+  const [facPhoto, setFacPhoto] = useState('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80');
+
+  // Course modal / state (Add & Edit)
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
+  const [crsCode, setCrsCode] = useState('');
+  const [crsTitle, setCrsTitle] = useState('');
+  const [crsLevel, setCrsLevel] = useState<Course['level']>('Bachelor');
+  const [crsDuration, setCrsDuration] = useState('3 Years');
+  const [crsMode, setCrsMode] = useState<Course['mode']>('Residential & Day Scholar');
+  const [crsLanguage, setCrsLanguage] = useState('English & Tamil');
+  const [crsCredits, setCrsCredits] = useState(96);
+  const [crsTuition, setCrsTuition] = useState('₹18,000 / Year (Scholarship Available)');
+  const [crsEligibility, setCrsEligibility] = useState('10+2 / Higher Secondary Pass');
+  const [crsDesc, setCrsDesc] = useState('');
+
+  // Subject modal / state (Add & Edit)
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
+  const [subCode, setSubCode] = useState('');
+  const [subName, setSubName] = useState('');
+  const [subCourseId, setSubCourseId] = useState('bth');
+  const [subCredits, setSubCredits] = useState(4);
+  const [subSemester, setSubSemester] = useState('Year 1 - Sem I');
+  const [subFaculty, setSubFaculty] = useState('Pr. Christopher');
+
+  // Notice form (Add & Edit)
+  const [editingNoticeId, setEditingNoticeId] = useState<string | null>(null);
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeCategory, setNoticeCategory] = useState<'Academic' | 'Chapel' | 'Examination' | 'Admissions' | 'Hostel'>('Academic');
   const [noticeUrgent, setNoticeUrgent] = useState(false);
   const [noticeContent, setNoticeContent] = useState('');
   const [noticeAuthor, setNoticeAuthor] = useState('Registrar Office');
 
-  // New Study Material form
+  // Study Material form (Add & Edit)
+  const [editingMatId, setEditingMatId] = useState<string | null>(null);
   const [matTitle, setMatTitle] = useState('');
   const [matCourse, setMatCourse] = useState('B.Th');
   const [matSubject, setMatSubject] = useState('');
-  const [matFaculty, setMatFaculty] = useState('Dr. Grace Joshua');
+  const [matFaculty, setMatFaculty] = useState('Pr. Christopher');
   const [matType, setMatType] = useState<'PDF' | 'Syllabus' | 'Lecture Notes' | 'Audio / Video' | 'Handout'>('PDF');
   const [matSize, setMatSize] = useState('2.5 MB');
   const [matDesc, setMatDesc] = useState('');
+  const [matUrl, setMatUrl] = useState('');
 
-  // New Event form
+  // Event form (Add & Edit)
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [eventTitle, setEventTitle] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [eventTime, setEventTime] = useState('9:30 AM – 4:00 PM');
@@ -192,6 +310,33 @@ export const AdminView: React.FC = () => {
   const [eventSpeaker, setEventSpeaker] = useState('');
   const [eventCategory, setEventCategory] = useState<'Conference' | 'Chapel' | 'Convocation' | 'Outreach' | 'Seminar'>('Seminar');
   const [eventDesc, setEventDesc] = useState('');
+  const [eventImage, setEventImage] = useState('https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80');
+
+  // Gallery form (Add & Edit)
+  const [editingGalleryId, setEditingGalleryId] = useState<string | null>(null);
+  const [galTitle, setGalTitle] = useState('');
+  const [galCategory, setGalCategory] = useState<GalleryPhoto['category']>('Campus');
+  const [galImage, setGalImage] = useState('');
+  const [galCaption, setGalCaption] = useState('');
+
+  // Downloads form (Add & Edit)
+  const [editingDownloadId, setEditingDownloadId] = useState<string | null>(null);
+  const [dlTitle, setDlTitle] = useState('');
+  const [dlCategory, setDlCategory] = useState<DownloadDoc['category']>('Forms');
+  const [dlFormat, setDlFormat] = useState<DownloadDoc['format']>('PDF');
+  const [dlSize, setDlSize] = useState('1.4 MB');
+  const [dlDesc, setDlDesc] = useState('');
+
+  // Inquiries / Messages modal (Add & Edit)
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [msgName, setMsgName] = useState('');
+  const [msgEmail, setMsgEmail] = useState('');
+  const [msgPhone, setMsgPhone] = useState('');
+  const [msgSubject, setMsgSubject] = useState('');
+  const [msgContent, setMsgContent] = useState('');
+  const [msgIsPrayer, setMsgIsPrayer] = useState(false);
+  const [msgStatus, setMsgStatus] = useState<'New' | 'Prayed / Answered'>('New');
 
   // Check if authenticated as admin or super_admin
   const isAuthorized =
@@ -294,16 +439,38 @@ export const AdminView: React.FC = () => {
       showToast('error', 'Please provide title and content for the notice.');
       return;
     }
-    addNotice({
-      title: noticeTitle,
-      category: noticeCategory,
-      isUrgent: noticeUrgent,
-      content: noticeContent,
-      postedBy: noticeAuthor
-    });
+    if (editingNoticeId) {
+      updateNotice(editingNoticeId, {
+        title: noticeTitle,
+        category: noticeCategory,
+        isUrgent: noticeUrgent,
+        content: noticeContent,
+        postedBy: noticeAuthor
+      });
+      setEditingNoticeId(null);
+      showToast('success', 'Notice updated successfully.');
+    } else {
+      addNotice({
+        title: noticeTitle,
+        category: noticeCategory,
+        isUrgent: noticeUrgent,
+        content: noticeContent,
+        postedBy: noticeAuthor
+      });
+      showToast('success', 'Notice published successfully to public bulletin.');
+    }
     setNoticeTitle('');
     setNoticeContent('');
-    showToast('success', 'Notice published successfully to public bulletin and notices table.');
+    setNoticeUrgent(false);
+  };
+
+  const handleEditNoticeClick = (n: Notice) => {
+    setEditingNoticeId(n.id);
+    setNoticeTitle(n.title);
+    setNoticeCategory(n.category);
+    setNoticeUrgent(Boolean(n.isUrgent));
+    setNoticeContent(n.content);
+    setNoticeAuthor(n.postedBy || 'Registrar Office');
   };
 
   const handleCreateMaterial = (e: React.FormEvent) => {
@@ -312,20 +479,50 @@ export const AdminView: React.FC = () => {
       showToast('error', 'Please provide a title and theological subject.');
       return;
     }
-    addStudyMaterial({
-      title: matTitle,
-      courseCode: matCourse,
-      courseName: matCourse === 'B.Th' ? 'Bachelor of Theology' : 'Master of Divinity',
-      subject: matSubject,
-      facultyName: matFaculty,
-      type: matType,
-      fileSize: matSize,
-      description: matDesc || 'Official lecture course material.'
-    });
+    if (editingMatId) {
+      updateStudyMaterial(editingMatId, {
+        title: matTitle,
+        courseCode: matCourse,
+        courseName: matCourse === 'B.Th' ? 'Bachelor of Theology' : matCourse === 'M.Div' ? 'Master of Divinity' : 'Certificate in Biblical Studies',
+        subject: matSubject,
+        facultyName: matFaculty,
+        type: matType,
+        fileSize: matSize,
+        description: matDesc || 'Official lecture course material.',
+        downloadUrl: matUrl || undefined
+      });
+      setEditingMatId(null);
+      showToast('success', 'Study material updated!');
+    } else {
+      addStudyMaterial({
+        title: matTitle,
+        courseCode: matCourse,
+        courseName: matCourse === 'B.Th' ? 'Bachelor of Theology' : matCourse === 'M.Div' ? 'Master of Divinity' : 'Certificate in Biblical Studies',
+        subject: matSubject,
+        facultyName: matFaculty,
+        type: matType,
+        fileSize: matSize,
+        description: matDesc || 'Official lecture course material.',
+        downloadUrl: matUrl || undefined
+      });
+      showToast('success', 'Study material notes registered and synced!');
+    }
     setMatTitle('');
     setMatSubject('');
     setMatDesc('');
-    showToast('success', 'Study material notes registered and synced!');
+    setMatUrl('');
+  };
+
+  const handleEditMaterialClick = (m: StudyMaterial) => {
+    setEditingMatId(m.id);
+    setMatTitle(m.title);
+    setMatCourse(m.courseCode);
+    setMatSubject(m.subject);
+    setMatFaculty(m.facultyName);
+    setMatType(m.type);
+    setMatSize(m.fileSize);
+    setMatDesc(m.description);
+    setMatUrl(m.downloadUrl || '');
   };
 
   const handleCreateEvent = (e: React.FormEvent) => {
@@ -334,22 +531,155 @@ export const AdminView: React.FC = () => {
       showToast('error', 'Please provide event title and date.');
       return;
     }
-    addEvent({
-      title: eventTitle,
-      date: eventDate,
-      time: eventTime,
-      location: eventLocation,
-      speaker: eventSpeaker || 'Pr. Christopher',
-      category: eventCategory,
-      description: eventDesc || 'Special campus gathering for theological growth.',
-      image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80',
-      registrationOpen: true
-    });
+    if (editingEventId) {
+      updateEvent(editingEventId, {
+        title: eventTitle,
+        date: eventDate,
+        time: eventTime,
+        location: eventLocation,
+        speaker: eventSpeaker || 'Pr. Christopher',
+        category: eventCategory,
+        description: eventDesc || 'Special campus gathering for theological growth.',
+        image: eventImage || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80'
+      });
+      setEditingEventId(null);
+      showToast('success', 'Event updated successfully.');
+    } else {
+      addEvent({
+        title: eventTitle,
+        date: eventDate,
+        time: eventTime,
+        location: eventLocation,
+        speaker: eventSpeaker || 'Pr. Christopher',
+        category: eventCategory,
+        description: eventDesc || 'Special campus gathering for theological growth.',
+        image: eventImage || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80',
+        registrationOpen: true
+      });
+      showToast('success', 'Event successfully scheduled and published.');
+    }
     setEventTitle('');
     setEventDate('');
     setEventSpeaker('');
     setEventDesc('');
-    showToast('success', 'Event successfully scheduled and published.');
+  };
+
+  const handleEditEventClick = (ev: EventItem) => {
+    setEditingEventId(ev.id);
+    setEventTitle(ev.title);
+    setEventDate(ev.date);
+    setEventTime(ev.time);
+    setEventLocation(ev.location);
+    setEventSpeaker(ev.speaker);
+    setEventCategory(ev.category);
+    setEventDesc(ev.description);
+    setEventImage(ev.image);
+  };
+
+  const handleSaveGallery = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!galTitle || !galImage) {
+      showToast('error', 'Please provide photo title and image URL.');
+      return;
+    }
+    if (editingGalleryId) {
+      updateGalleryPhoto(editingGalleryId, {
+        title: galTitle,
+        category: galCategory,
+        image: galImage,
+        caption: galCaption
+      });
+      setEditingGalleryId(null);
+      showToast('success', 'Gallery photo updated.');
+    } else {
+      addGalleryPhoto({
+        title: galTitle,
+        category: galCategory,
+        image: galImage,
+        caption: galCaption
+      });
+      showToast('success', 'Photo added to campus gallery.');
+    }
+    setGalTitle('');
+    setGalImage('');
+    setGalCaption('');
+  };
+
+  const handleEditGalleryClick = (g: GalleryPhoto) => {
+    setEditingGalleryId(g.id);
+    setGalTitle(g.title);
+    setGalCategory(g.category);
+    setGalImage(g.image);
+    setGalCaption(g.caption);
+  };
+
+  const handleSaveDownload = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dlTitle) {
+      showToast('error', 'Please provide document title.');
+      return;
+    }
+    if (editingDownloadId) {
+      updateDownload(editingDownloadId, {
+        title: dlTitle,
+        category: dlCategory,
+        format: dlFormat,
+        fileSize: dlSize,
+        description: dlDesc
+      });
+      setEditingDownloadId(null);
+      showToast('success', 'Downloadable document updated.');
+    } else {
+      addDownload({
+        title: dlTitle,
+        category: dlCategory,
+        format: dlFormat,
+        fileSize: dlSize,
+        description: dlDesc || 'Official college document for download.'
+      });
+      showToast('success', 'Document added to Downloads page.');
+    }
+    setDlTitle('');
+    setDlDesc('');
+  };
+
+  const handleEditDownloadClick = (d: DownloadDoc) => {
+    setEditingDownloadId(d.id);
+    setDlTitle(d.title);
+    setDlCategory(d.category);
+    setDlFormat(d.format);
+    setDlSize(d.fileSize);
+    setDlDesc(d.description);
+  };
+
+  const openAddStudentModal = () => {
+    setEditingStudentId(null);
+    setNewStdRegNo('');
+    setNewStdName('');
+    setNewStdEmail('');
+    setNewStdPhone('');
+    setNewStdCourse('bth');
+    setNewStdYear('Year 1 (Semester I)');
+    setNewStdBatch('Batch of 2026–2029');
+    setNewStdGpa('3.80 / 4.0');
+    setNewStdAttendance(95);
+    setNewStdAvatar('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80');
+    setShowAddStudentModal(true);
+  };
+
+  const openEditStudentModal = (std: StudentProfile) => {
+    setEditingStudentId(std.id);
+    setNewStdRegNo(std.regNo);
+    setNewStdName(std.name);
+    setNewStdEmail(std.email);
+    setNewStdPhone(std.phone);
+    setNewStdCourse(std.courseId);
+    setNewStdYear(std.currentYear);
+    setNewStdBatch(std.batch);
+    setNewStdGpa(std.gpa);
+    setNewStdAttendance(std.attendancePercent);
+    setNewStdAvatar(std.avatar);
+    setShowAddStudentModal(true);
   };
 
   const handleAddStudentSubmit = (e: React.FormEvent) => {
@@ -358,39 +688,403 @@ export const AdminView: React.FC = () => {
       showToast('error', 'Please enter student name and email.');
       return;
     }
-    const randId = Math.floor(10 + Math.random() * 90);
-    const regNo = `ICBC-2026-${newStdCourse.toUpperCase()}-${randId}`;
-    const id = `std-${Date.now()}`;
+    const courseTitle =
+      newStdCourse === 'bth'
+        ? 'Bachelor of Theology'
+        : newStdCourse === 'mdiv'
+        ? 'Master of Divinity'
+        : 'Certificate in Theology';
 
-    addStudent({
-      id,
-      regNo,
-      name: newStdName,
-      email: newStdEmail,
-      phone: newStdPhone || '+91 98400 12345',
-      courseId: newStdCourse,
-      courseTitle: newStdCourse === 'bth' ? 'Bachelor of Theology' : 'Master of Divinity',
-      currentYear: newStdYear,
-      batch: 'Batch of 2026–2029',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-      attendancePercent: 95.0,
-      gpa: '3.80 / 4.0',
-      enrolledSubjects: subjectsList.slice(0, 4).map(sub => ({
-        code: sub.subjectCode,
-        name: sub.subjectName,
-        faculty: sub.facultyName,
-        credits: sub.credits,
-        grade: 'A',
-        attendance: 95
-      })),
-      recentAssignments: []
-    });
+    if (editingStudentId) {
+      updateStudent(editingStudentId, {
+        regNo: newStdRegNo || `ICBC-2026-${newStdCourse.toUpperCase()}-10`,
+        name: newStdName,
+        email: newStdEmail,
+        phone: newStdPhone || '+91 98400 12345',
+        courseId: newStdCourse,
+        courseTitle,
+        currentYear: newStdYear,
+        batch: newStdBatch,
+        gpa: newStdGpa,
+        attendancePercent: Number(newStdAttendance) || 95,
+        avatar: newStdAvatar
+      });
+      showToast('success', `Student profile for ${newStdName} updated.`);
+    } else {
+      const randId = Math.floor(10 + Math.random() * 90);
+      const regNo = newStdRegNo.trim() || `ICBC-2026-${newStdCourse.toUpperCase()}-${randId}`;
+      const id = `std-${Date.now()}`;
 
-    setNewStdName('');
-    setNewStdEmail('');
-    setNewStdPhone('');
+      addStudent({
+        id,
+        regNo,
+        name: newStdName,
+        email: newStdEmail,
+        phone: newStdPhone || '+91 98400 12345',
+        courseId: newStdCourse,
+        courseTitle,
+        currentYear: newStdYear,
+        batch: newStdBatch || 'Batch of 2026–2029',
+        avatar: newStdAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+        attendancePercent: Number(newStdAttendance) || 95,
+        gpa: newStdGpa || '3.80 / 4.0',
+        enrolledSubjects: subjectsList.slice(0, 4).map(sub => ({
+          code: sub.subjectCode,
+          name: sub.subjectName,
+          faculty: sub.facultyName,
+          credits: sub.credits,
+          grade: 'A',
+          attendance: 95
+        })),
+        recentAssignments: []
+      });
+      showToast('success', `Student registered with ID ${regNo} in database.`);
+    }
+
     setShowAddStudentModal(false);
-    showToast('success', `Student registered with ID ${regNo} in database.`);
+    setEditingStudentId(null);
+  };
+
+  const openAddFacultyModal = () => {
+    setEditingFacultyId(null);
+    setFacName('');
+    setFacRole('Professor of Theology');
+    setFacDept('Department of Biblical & Theological Studies');
+    setFacDegrees('M.Div., M.Th.');
+    setFacAlmaMater('Senate of Serampore');
+    setFacExp(10);
+    setFacSubjects('Systematic Theology, Homiletics');
+    setFacBio('');
+    setFacQuote('');
+    setFacPhoto('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80');
+    setShowFacultyModal(true);
+  };
+
+  const openEditFacultyModal = (f: FacultyMember) => {
+    setEditingFacultyId(f.id);
+    setFacName(f.name);
+    setFacRole(f.role);
+    setFacDept(f.department);
+    setFacDegrees(f.degrees);
+    setFacAlmaMater(f.almaMater);
+    setFacExp(f.yearsOfExperience);
+    setFacSubjects(f.subjects.join(', '));
+    setFacBio(f.bio);
+    setFacQuote(f.quote || '');
+    setFacPhoto(f.photo);
+    setShowFacultyModal(true);
+  };
+
+  const handleSaveFaculty = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!facName.trim()) {
+      showToast('error', 'Please enter faculty member name.');
+      return;
+    }
+    const subjectsArr = facSubjects
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    if (editingFacultyId) {
+      updateFaculty(editingFacultyId, {
+        name: facName,
+        role: facRole,
+        department: facDept,
+        degrees: facDegrees,
+        almaMater: facAlmaMater,
+        yearsOfExperience: Number(facExp) || 5,
+        subjects: subjectsArr,
+        bio: facBio,
+        quote: facQuote,
+        photo: facPhoto
+      });
+      showToast('success', `Faculty profile for ${facName} updated.`);
+    } else {
+      addFaculty({
+        name: facName,
+        role: facRole,
+        department: facDept,
+        degrees: facDegrees,
+        almaMater: facAlmaMater,
+        yearsOfExperience: Number(facExp) || 5,
+        subjects: subjectsArr.length ? subjectsArr : ['Biblical Studies'],
+        bio: facBio || 'Dedicated faculty member equipping servant leaders through the Word of God.',
+        quote: facQuote || 'Equipping lives for the Great Commission.',
+        photo: facPhoto || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80'
+      });
+      showToast('success', `Added ${facName} to Faculty directory.`);
+    }
+    setShowFacultyModal(false);
+    setEditingFacultyId(null);
+  };
+
+  const openAddCourseModal = () => {
+    setEditingCourseId(null);
+    setCrsCode('DIP.TH');
+    setCrsTitle('');
+    setCrsLevel('Bachelor');
+    setCrsDuration('3 Years');
+    setCrsMode('Residential & Day Scholar');
+    setCrsLanguage('English & Tamil');
+    setCrsCredits(96);
+    setCrsTuition('₹18,000 / Year');
+    setCrsEligibility('10+2 or Equivalent');
+    setCrsDesc('');
+    setShowCourseModal(true);
+  };
+
+  const openEditCourseModal = (c: Course) => {
+    setEditingCourseId(c.id);
+    setCrsCode(c.code);
+    setCrsTitle(c.title);
+    setCrsLevel(c.level);
+    setCrsDuration(c.duration);
+    setCrsMode(c.mode);
+    setCrsLanguage(c.language);
+    setCrsCredits(c.totalCredits);
+    setCrsTuition(c.annualTuition);
+    setCrsEligibility(c.eligibility);
+    setCrsDesc(c.description);
+    setShowCourseModal(true);
+  };
+
+  const handleSaveCourse = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!crsTitle.trim() || !crsCode.trim()) {
+      showToast('error', 'Please enter course code and title.');
+      return;
+    }
+    if (editingCourseId) {
+      updateCourse(editingCourseId, {
+        code: crsCode,
+        title: crsTitle,
+        level: crsLevel,
+        duration: crsDuration,
+        mode: crsMode,
+        language: crsLanguage,
+        totalCredits: Number(crsCredits) || 60,
+        annualTuition: crsTuition,
+        eligibility: crsEligibility,
+        description: crsDesc
+      });
+      showToast('success', `Course "${crsTitle}" updated.`);
+    } else {
+      const id = crsCode.toLowerCase().replace(/[^a-z0-9]/g, '') || `crs-${Date.now()}`;
+      addCourse({
+        id,
+        code: crsCode,
+        title: crsTitle,
+        level: crsLevel,
+        duration: crsDuration,
+        mode: crsMode,
+        language: crsLanguage,
+        totalCredits: Number(crsCredits) || 60,
+        annualTuition: crsTuition,
+        eligibility: crsEligibility,
+        description: crsDesc || 'Comprehensive theological degree program equipping leaders for ministry.',
+        curriculum: [
+          {
+            year: 'Year 1: Biblical Foundations',
+            courses: ['Old Testament Survey', 'New Testament Survey', 'Systematic Theology I', 'Spiritual Formation']
+          }
+        ],
+        outcomes: ['Sound biblical exegesis', 'Pastoral leadership & preaching']
+      });
+      showToast('success', `Course "${crsTitle}" added.`);
+    }
+    setShowCourseModal(false);
+    setEditingCourseId(null);
+  };
+
+  const openAddSubjectModal = () => {
+    setEditingSubjectId(null);
+    setSubCode('TH-105');
+    setSubName('');
+    setSubCourseId('bth');
+    setSubCredits(4);
+    setSubSemester('Year 1 - Sem I');
+    setSubFaculty('Pr. Christopher');
+    setShowSubjectModal(true);
+  };
+
+  const openEditSubjectModal = (sub: SubjectItem) => {
+    setEditingSubjectId(sub.id);
+    setSubCode(sub.subjectCode);
+    setSubName(sub.subjectName);
+    setSubCourseId(sub.courseId);
+    setSubCredits(sub.credits);
+    setSubSemester(sub.semesterOrYear);
+    setSubFaculty(sub.facultyName);
+    setShowSubjectModal(true);
+  };
+
+  const handleSaveSubject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subName.trim() || !subCode.trim()) {
+      showToast('error', 'Please enter subject code and name.');
+      return;
+    }
+    if (editingSubjectId) {
+      updateSubject(editingSubjectId, {
+        subjectCode: subCode,
+        subjectName: subName,
+        courseId: subCourseId,
+        credits: Number(subCredits) || 3,
+        semesterOrYear: subSemester,
+        facultyName: subFaculty
+      });
+      showToast('success', `Subject "${subName}" updated.`);
+    } else {
+      addSubject({
+        id: `sub-${Date.now()}`,
+        subjectCode: subCode,
+        subjectName: subName,
+        courseId: subCourseId,
+        credits: Number(subCredits) || 3,
+        semesterOrYear: subSemester,
+        facultyName: subFaculty
+      });
+      showToast('success', `Subject "${subName}" added.`);
+    }
+    setShowSubjectModal(false);
+    setEditingSubjectId(null);
+  };
+
+  const openAddAppModal = () => {
+    setEditingAppId(null);
+    setAppFormName('');
+    setAppFormEmail('');
+    setAppFormPhone('');
+    setAppFormDob('2002-05-15');
+    setAppFormGender('Male');
+    setAppFormCourseId('bth');
+    setAppFormEducation('Higher Secondary (12th)');
+    setAppFormChurch('');
+    setAppFormPastor('');
+    setAppFormPastorPhone('');
+    setAppFormTestimony('');
+    setAppFormCalling('Pastoral Ministry');
+    setAppFormStatus('Under Review');
+    setShowAppModal(true);
+  };
+
+  const openEditAppModal = (app: ApplicationSubmission) => {
+    setEditingAppId(app.id);
+    setAppFormName(app.fullName);
+    setAppFormEmail(app.email);
+    setAppFormPhone(app.phone);
+    setAppFormDob(app.dateOfBirth);
+    setAppFormGender(app.gender);
+    setAppFormCourseId(app.courseId);
+    setAppFormEducation(app.previousEducation);
+    setAppFormChurch(app.homeChurch);
+    setAppFormPastor(app.pastorName);
+    setAppFormPastorPhone(app.pastorPhone);
+    setAppFormTestimony(app.personalTestimony);
+    setAppFormCalling(app.ministryCalling);
+    setAppFormStatus(app.status);
+    setShowAppModal(true);
+  };
+
+  const handleSaveApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!appFormName.trim() || !appFormEmail.trim()) {
+      showToast('error', 'Please enter applicant name and email.');
+      return;
+    }
+    if (editingAppId) {
+      await updateApplication(editingAppId, {
+        fullName: appFormName,
+        email: appFormEmail,
+        phone: appFormPhone,
+        dateOfBirth: appFormDob,
+        gender: appFormGender,
+        courseId: appFormCourseId,
+        previousEducation: appFormEducation,
+        homeChurch: appFormChurch,
+        pastorName: appFormPastor,
+        pastorPhone: appFormPastorPhone,
+        personalTestimony: appFormTestimony,
+        ministryCalling: appFormCalling,
+        status: appFormStatus
+      });
+      showToast('success', `Application for ${appFormName} updated.`);
+    } else {
+      await submitApplication({
+        fullName: appFormName,
+        email: appFormEmail,
+        phone: appFormPhone || '+91 95004 23126',
+        dateOfBirth: appFormDob || '2000-01-01',
+        gender: appFormGender,
+        courseId: appFormCourseId,
+        previousEducation: appFormEducation || 'Higher Secondary',
+        homeChurch: appFormChurch || 'Local Evangelical Church',
+        pastorName: appFormPastor || 'Pr. Christopher',
+        pastorPhone: appFormPastorPhone || '+91 95004 23126',
+        personalTestimony: appFormTestimony || 'Committed to serving Christ.',
+        ministryCalling: appFormCalling || 'Pastoral Ministry'
+      });
+      showToast('success', `New admission application created for ${appFormName}.`);
+    }
+    setShowAppModal(false);
+    setEditingAppId(null);
+  };
+
+  const openAddMessageModal = () => {
+    setEditingMsgId(null);
+    setMsgName('');
+    setMsgEmail('');
+    setMsgPhone('');
+    setMsgSubject('');
+    setMsgContent('');
+    setMsgIsPrayer(false);
+    setMsgStatus('New');
+    setShowMessageModal(true);
+  };
+
+  const openEditMessageModal = (m: ContactMessage) => {
+    setEditingMsgId(m.id);
+    setMsgName(m.name);
+    setMsgEmail(m.email);
+    setMsgPhone(m.phone);
+    setMsgSubject(m.subject);
+    setMsgContent(m.message);
+    setMsgIsPrayer(m.isPrayerRequest);
+    setMsgStatus(m.status);
+    setShowMessageModal(true);
+  };
+
+  const handleSaveMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!msgName.trim() || !msgContent.trim()) {
+      showToast('error', 'Please enter name and message content.');
+      return;
+    }
+    if (editingMsgId) {
+      await updateContactMessage(editingMsgId, {
+        name: msgName,
+        email: msgEmail,
+        phone: msgPhone,
+        subject: msgSubject,
+        message: msgContent,
+        isPrayerRequest: msgIsPrayer,
+        status: msgStatus
+      });
+      showToast('success', 'Inquiry / prayer request updated.');
+    } else {
+      await submitContactMessage({
+        name: msgName,
+        email: msgEmail || 'visitor@iocbc.edu.in',
+        phone: msgPhone || '+91 95004 23126',
+        subject: msgSubject || 'General Inquiry',
+        message: msgContent,
+        isPrayerRequest: msgIsPrayer
+      });
+      showToast('success', 'New inquiry / prayer request added.');
+    }
+    setShowMessageModal(false);
+    setEditingMsgId(null);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -785,7 +1479,7 @@ export const AdminView: React.FC = () => {
 
           <button
             onClick={() => setAdminTab('events')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap cursor-pointer ${
               adminTab === 'events'
                 ? 'bg-blue-900 text-amber-300 shadow'
                 : 'text-stone-600 hover:text-slate-900 hover:bg-stone-100'
@@ -796,32 +1490,32 @@ export const AdminView: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setAdminTab('storage')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap ${
-              adminTab === 'storage'
+            onClick={() => setAdminTab('gallery')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap cursor-pointer ${
+              adminTab === 'gallery'
                 ? 'bg-blue-900 text-amber-300 shadow'
                 : 'text-stone-600 hover:text-slate-900 hover:bg-stone-100'
             }`}
           >
-            <HardDrive className="w-3.5 h-3.5 mr-1.5" />
-            <span>Supabase Storage</span>
+            <ImageIcon className="w-3.5 h-3.5 mr-1.5" />
+            <span>Gallery ({gallery.length})</span>
           </button>
 
           <button
-            onClick={() => setAdminTab('supabase')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap ${
-              adminTab === 'supabase'
-                ? 'bg-emerald-900 text-emerald-300 shadow'
-                : 'text-emerald-800 hover:bg-emerald-50'
+            onClick={() => setAdminTab('downloads')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap cursor-pointer ${
+              adminTab === 'downloads'
+                ? 'bg-blue-900 text-amber-300 shadow'
+                : 'text-stone-600 hover:text-slate-900 hover:bg-stone-100'
             }`}
           >
-            <Database className="w-3.5 h-3.5 mr-1.5" />
-            <span>Supabase DB & Setup</span>
+            <Download className="w-3.5 h-3.5 mr-1.5" />
+            <span>Downloads ({downloads.length})</span>
           </button>
 
           <button
             onClick={() => setAdminTab('messages')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap cursor-pointer ${
               adminTab === 'messages'
                 ? 'bg-blue-900 text-amber-300 shadow'
                 : 'text-stone-600 hover:text-slate-900 hover:bg-stone-100'
@@ -832,21 +1526,61 @@ export const AdminView: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setAdminTab('storage')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap cursor-pointer ${
+              adminTab === 'storage'
+                ? 'bg-blue-900 text-amber-300 shadow'
+                : 'text-stone-600 hover:text-slate-900 hover:bg-stone-100'
+            }`}
+          >
+            <HardDrive className="w-3.5 h-3.5 mr-1.5" />
+            <span>Storage ({uploadedFiles.length})</span>
+          </button>
+
+          <button
+            onClick={() => setAdminTab('supabase')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap cursor-pointer ${
+              adminTab === 'supabase'
+                ? 'bg-emerald-900 text-emerald-300 shadow'
+                : 'text-emerald-800 hover:bg-emerald-50'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5 mr-1.5" />
+            <span>Supabase DB</span>
+          </button>
+
+          <button
             onClick={() => setAdminTab('themes')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap cursor-pointer ${
               adminTab === 'themes'
                 ? 'bg-amber-500 text-slate-950 shadow font-extrabold ring-1 ring-amber-400'
                 : 'text-stone-600 hover:text-slate-900 hover:bg-stone-100'
             }`}
           >
             <Palette className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
-            <span>Theme & Styling Studio</span>
+            <span>Theme Studio</span>
           </button>
         </div>
 
         {/* TAB 1: ADMISSIONS */}
         {adminTab === 'applications' && (
           <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-cinzel text-xl font-bold text-slate-900">Admission Applications</h3>
+                <p className="text-xs text-stone-500">
+                  Add, edit, review, and delete candidate admission applications.
+                </p>
+              </div>
+              <button
+                onClick={openAddAppModal}
+                className="px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Application</span>
+              </button>
+            </div>
+
             {/* Filters */}
             <div className="bg-white rounded-2xl border border-stone-200 p-4 flex flex-col sm:flex-row gap-3 items-center justify-between">
               <div className="relative flex-1 w-full">
@@ -856,7 +1590,7 @@ export const AdminView: React.FC = () => {
                   value={appSearch}
                   onChange={e => setAppSearch(e.target.value)}
                   placeholder="Search by candidate name, reg no, or email..."
-                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-stone-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                 />
               </div>
 
@@ -905,8 +1639,8 @@ export const AdminView: React.FC = () => {
                       <tr>
                         <td colSpan={6} className="px-5 py-12 text-center text-stone-400">
                           <FileText className="w-8 h-8 text-stone-300 mx-auto mb-2" />
-                          <p className="font-semibold text-slate-700 text-sm">No admission applications received yet.</p>
-                          <p className="text-xs text-stone-400 mt-1">New applicant submissions from the Admissions Portal will appear here in real time.</p>
+                          <p className="font-semibold text-slate-700 text-sm">No admission applications found.</p>
+                          <p className="text-xs text-stone-400 mt-1">Click "Add Application" above or submit from the Admissions page.</p>
                         </td>
                       </tr>
                     ) : (
@@ -950,13 +1684,35 @@ export const AdminView: React.FC = () => {
                             </select>
                           </td>
                           <td className="px-5 py-4 text-right">
-                            <button
-                              onClick={() => setInspectedApp(app)}
-                              className="px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-slate-800 font-semibold text-[11px] inline-flex items-center space-x-1"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>View Dossier</span>
-                            </button>
+                            <div className="inline-flex items-center space-x-1.5">
+                              <button
+                                onClick={() => setInspectedApp(app)}
+                                className="px-2.5 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-slate-800 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                                title="View Dossier"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>View</span>
+                              </button>
+                              <button
+                                onClick={() => openEditAppModal(app)}
+                                className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                                title="Edit Application"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  deleteApplication(app.id);
+                                  showToast('success', `Application for ${app.fullName} deleted.`);
+                                }}
+                                className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                                title="Delete Application"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -975,12 +1731,12 @@ export const AdminView: React.FC = () => {
               <div>
                 <h3 className="font-cinzel text-xl font-bold text-slate-900">Enrolled Student Roster</h3>
                 <p className="text-xs text-stone-500">
-                  Manage student profiles, GPA standings, attendance, and registry numbers in the <code>students</code> table.
+                  Add, edit, and delete student profiles, GPA standings, attendance, and registry numbers.
                 </p>
               </div>
               <button
-                onClick={() => setShowAddStudentModal(true)}
-                className="px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow"
+                onClick={openAddStudentModal}
+                className="px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Student</span>
@@ -989,36 +1745,62 @@ export const AdminView: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {studentsList.map(std => (
-                <div key={std.id} className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <img
-                      src={std.avatar}
-                      alt={std.name}
-                      className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-500/40 shadow-sm"
-                    />
-                    <div>
-                      <span className="font-mono text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-bold">
-                        {std.regNo}
-                      </span>
-                      <h4 className="font-cinzel font-bold text-slate-900 text-base">{std.name}</h4>
-                      <p className="text-xs text-stone-500">{std.courseTitle}</p>
+                <div key={std.id} className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center space-x-3.5">
+                        <img
+                          src={std.avatar}
+                          alt={std.name}
+                          className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-500/40 shadow-sm shrink-0"
+                        />
+                        <div>
+                          <span className="font-mono text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-bold">
+                            {std.regNo}
+                          </span>
+                          <h4 className="font-cinzel font-bold text-slate-900 text-base mt-0.5">{std.name}</h4>
+                          <p className="text-xs text-stone-500">{std.courseTitle}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100 text-xs">
+                      <div className="bg-stone-50 p-2.5 rounded-xl">
+                        <span className="text-[10px] uppercase text-stone-400 font-bold block">GPA Standing</span>
+                        <span className="font-bold text-slate-900">{std.gpa}</span>
+                      </div>
+                      <div className="bg-stone-50 p-2.5 rounded-xl">
+                        <span className="text-[10px] uppercase text-stone-400 font-bold block">Attendance</span>
+                        <span className="font-bold text-emerald-700">{std.attendancePercent}%</span>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-stone-600 space-y-1">
+                      <div><strong>Email:</strong> {std.email}</div>
+                      <div><strong>Phone:</strong> {std.phone}</div>
+                      <div><strong>Year:</strong> {std.currentYear}</div>
+                      <div><strong>Batch:</strong> {std.batch}</div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100 text-xs">
-                    <div className="bg-stone-50 p-2.5 rounded-xl">
-                      <span className="text-[10px] uppercase text-stone-400 font-bold block">GPA Standing</span>
-                      <span className="font-bold text-slate-900">{std.gpa}</span>
-                    </div>
-                    <div className="bg-stone-50 p-2.5 rounded-xl">
-                      <span className="text-[10px] uppercase text-stone-400 font-bold block">Attendance</span>
-                      <span className="font-bold text-emerald-700">{std.attendancePercent}%</span>
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-stone-600 space-y-1">
-                    <div><strong>Email:</strong> {std.email}</div>
-                    <div><strong>Batch:</strong> {std.batch}</div>
+                  <div className="pt-3 border-t border-stone-100 flex items-center justify-end space-x-2">
+                    <button
+                      onClick={() => openEditStudentModal(std)}
+                      className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-xs inline-flex items-center space-x-1 cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        deleteStudent(std.id);
+                        showToast('success', `Student ${std.name} removed.`);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs inline-flex items-center space-x-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1029,41 +1811,72 @@ export const AdminView: React.FC = () => {
         {/* TAB 3: FACULTY */}
         {adminTab === 'faculty' && (
           <div className="space-y-6">
-            <div>
-              <h3 className="font-cinzel text-xl font-bold text-slate-900">Theological Faculty Registry</h3>
-              <p className="text-xs text-stone-500">
-                Distinguished professors, deans, and ministry lecturers registered in the <code>faculty</code> table.
-              </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-cinzel text-xl font-bold text-slate-900">Theological Faculty Registry</h3>
+                <p className="text-xs text-stone-500">
+                  Add, edit, and delete professors, deans, and ministry lecturers.
+                </p>
+              </div>
+              <button
+                onClick={openAddFacultyModal}
+                className="px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Faculty</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {faculty.map(f => (
-                <div key={f.id} className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <img
-                      src={f.photo}
-                      alt={f.name}
-                      className="w-14 h-14 rounded-2xl object-cover border-2 border-stone-200 shadow-sm"
-                    />
-                    <div>
-                      <h4 className="font-cinzel font-bold text-slate-900 text-base">{f.name}</h4>
-                      <p className="text-xs text-amber-800 font-semibold">{f.role}</p>
-                      <p className="text-[11px] text-stone-500">{f.department}</p>
+                <div key={f.id} className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <img
+                        src={f.photo}
+                        alt={f.name}
+                        className="w-14 h-14 rounded-2xl object-cover border-2 border-stone-200 shadow-sm shrink-0"
+                      />
+                      <div>
+                        <h4 className="font-cinzel font-bold text-slate-900 text-base">{f.name}</h4>
+                        <p className="text-xs text-amber-800 font-semibold">{f.role}</p>
+                        <p className="text-[11px] text-stone-500">{f.department}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-stone-600 space-y-1 pt-2 border-t border-stone-100">
+                      <div><strong>Degrees:</strong> {f.degrees}</div>
+                      <div><strong>Alma Mater:</strong> {f.almaMater}</div>
+                      <div><strong>Experience:</strong> {f.yearsOfExperience} Years</div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1">
+                      {f.subjects.map((sub, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded bg-stone-100 text-[10px] text-stone-600">
+                          {sub}
+                        </span>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="text-xs text-stone-600 space-y-1 pt-2 border-t border-stone-100">
-                    <div><strong>Degrees:</strong> {f.degrees}</div>
-                    <div><strong>Alma Mater:</strong> {f.almaMater}</div>
-                    <div><strong>Experience:</strong> {f.yearsOfExperience} Years</div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1">
-                    {f.subjects.slice(0, 3).map((sub, i) => (
-                      <span key={i} className="px-2 py-0.5 rounded bg-stone-100 text-[10px] text-stone-600">
-                        {sub}
-                      </span>
-                    ))}
+                  <div className="pt-3 border-t border-stone-100 flex items-center justify-end space-x-2">
+                    <button
+                      onClick={() => openEditFacultyModal(f)}
+                      className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-xs inline-flex items-center space-x-1 cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        deleteFaculty(f.id);
+                        showToast('success', `Faculty member ${f.name} removed.`);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs inline-flex items-center space-x-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1073,30 +1886,139 @@ export const AdminView: React.FC = () => {
 
         {/* TAB 4: COURSES & CURRICULUM */}
         {adminTab === 'courses' && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-cinzel text-xl font-bold text-slate-900">Academic Degree Programs & Subjects</h3>
-              <p className="text-xs text-stone-500">
-                Degree programs and subjects synced across the <code>courses</code> and <code>subjects</code> tables.
-              </p>
+          <div className="space-y-10">
+            {/* Degree Programs */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-cinzel text-xl font-bold text-slate-900">Academic Degree Programs ({courses.length})</h3>
+                  <p className="text-xs text-stone-500">
+                    Add, edit, and delete theological degree programs displayed on the Courses page.
+                  </p>
+                </div>
+                <button
+                  onClick={openAddCourseModal}
+                  className="px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Course</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {courses.map(c => (
+                  <div key={c.id} className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4 flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-900 text-xs font-bold uppercase">
+                            {c.level}
+                          </span>
+                          <span className="font-mono text-xs font-bold text-stone-500">{c.code}</span>
+                        </div>
+                        <span className="text-xs font-bold text-amber-800">{c.annualTuition}</span>
+                      </div>
+                      <div>
+                        <h4 className="font-cinzel text-lg font-bold text-slate-900">{c.title}</h4>
+                        <p className="text-xs text-stone-500">
+                          Duration: {c.duration} • Mode: {c.mode} • Credits: {c.totalCredits}
+                        </p>
+                      </div>
+                      <p className="text-xs text-stone-600 line-clamp-3">{c.description}</p>
+                    </div>
+
+                    <div className="pt-3 border-t border-stone-100 flex items-center justify-end space-x-2">
+                      <button
+                        onClick={() => openEditCourseModal(c)}
+                        className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-xs inline-flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          deleteCourse(c.id);
+                          showToast('success', `Course "${c.title}" deleted.`);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs inline-flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {courses.map(c => (
-                <div key={c.id} className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-900 text-xs font-bold uppercase">
-                      {c.level}
-                    </span>
-                    <span className="text-xs font-bold text-amber-800">{c.annualTuition}</span>
-                  </div>
-                  <div>
-                    <h4 className="font-cinzel text-lg font-bold text-slate-900">{c.title}</h4>
-                    <p className="text-xs text-stone-500">Duration: {c.duration} • Mode: {c.mode}</p>
-                  </div>
-                  <p className="text-xs text-stone-600 line-clamp-3">{c.description}</p>
+            {/* Curriculum Subjects */}
+            <div className="space-y-4 pt-6 border-t border-stone-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-cinzel text-xl font-bold text-slate-900">Curriculum Subjects ({subjectsList.length})</h3>
+                  <p className="text-xs text-stone-500">
+                    Manage individual theological subjects, credit hours, and assigned faculty.
+                  </p>
                 </div>
-              ))}
+                <button
+                  onClick={openAddSubjectModal}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Subject</span>
+                </button>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-stone-50 text-slate-700 font-bold uppercase tracking-wider border-b border-stone-200">
+                      <tr>
+                        <th className="px-5 py-3.5">Code</th>
+                        <th className="px-5 py-3.5">Subject Name</th>
+                        <th className="px-5 py-3.5">Degree</th>
+                        <th className="px-5 py-3.5">Semester</th>
+                        <th className="px-5 py-3.5">Credits</th>
+                        <th className="px-5 py-3.5">Faculty</th>
+                        <th className="px-5 py-3.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {subjectsList.map(sub => (
+                        <tr key={sub.id} className="hover:bg-stone-50">
+                          <td className="px-5 py-3.5 font-mono font-bold text-blue-950">{sub.subjectCode}</td>
+                          <td className="px-5 py-3.5 font-bold text-slate-900">{sub.subjectName}</td>
+                          <td className="px-5 py-3.5 uppercase font-semibold text-stone-600">{sub.courseId}</td>
+                          <td className="px-5 py-3.5 text-stone-600">{sub.semesterOrYear}</td>
+                          <td className="px-5 py-3.5 font-bold text-amber-800">{sub.credits} Cr</td>
+                          <td className="px-5 py-3.5 text-stone-700">{sub.facultyName}</td>
+                          <td className="px-5 py-3.5 text-right">
+                            <div className="inline-flex items-center space-x-1.5">
+                              <button
+                                onClick={() => openEditSubjectModal(sub)}
+                                className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  deleteSubject(sub.id);
+                                  showToast('success', `Subject "${sub.subjectName}" deleted.`);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1104,11 +2026,27 @@ export const AdminView: React.FC = () => {
         {/* TAB 5: NOTICES */}
         {adminTab === 'notices' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-sm">
-              <h3 className="font-cinzel font-bold text-slate-900 text-lg flex items-center space-x-2">
-                <Plus className="w-5 h-5 text-blue-900" />
-                <span>Publish Notice</span>
-              </h3>
+            <div className="lg:col-span-1 bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-sm h-fit">
+              <div className="flex items-center justify-between">
+                <h3 className="font-cinzel font-bold text-slate-900 text-lg flex items-center space-x-2">
+                  {editingNoticeId ? <Edit3 className="w-5 h-5 text-amber-600" /> : <Plus className="w-5 h-5 text-blue-900" />}
+                  <span>{editingNoticeId ? 'Edit Notice' : 'Publish Notice'}</span>
+                </h3>
+                {editingNoticeId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingNoticeId(null);
+                      setNoticeTitle('');
+                      setNoticeContent('');
+                      setNoticeUrgent(false);
+                    }}
+                    className="text-xs text-stone-500 hover:text-slate-900 underline cursor-pointer"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
 
               <form onSubmit={handleCreateNotice} className="space-y-3.5 text-xs">
                 <div>
@@ -1119,7 +2057,7 @@ export const AdminView: React.FC = () => {
                     value={noticeTitle}
                     onChange={e => setNoticeTitle(e.target.value)}
                     placeholder="e.g. Convocation 2026 Gown Fitting"
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   />
                 </div>
 
@@ -1128,7 +2066,7 @@ export const AdminView: React.FC = () => {
                   <select
                     value={noticeCategory}
                     onChange={e => setNoticeCategory(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   >
                     <option value="Academic">Academic</option>
                     <option value="Chapel">Chapel</option>
@@ -1139,6 +2077,17 @@ export const AdminView: React.FC = () => {
                 </div>
 
                 <div>
+                  <label className="block font-bold text-stone-700 mb-1">Posted By</label>
+                  <input
+                    type="text"
+                    value={noticeAuthor}
+                    onChange={e => setNoticeAuthor(e.target.value)}
+                    placeholder="e.g. Registrar Office"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+
+                <div>
                   <label className="block font-bold text-stone-700 mb-1">Content / Circular *</label>
                   <textarea
                     rows={4}
@@ -1146,7 +2095,7 @@ export const AdminView: React.FC = () => {
                     value={noticeContent}
                     onChange={e => setNoticeContent(e.target.value)}
                     placeholder="Full announcement details..."
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900 font-sans"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900 font-sans"
                   />
                 </div>
 
@@ -1165,9 +2114,9 @@ export const AdminView: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider transition-colors shadow"
+                  className="w-full py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider transition-colors shadow cursor-pointer"
                 >
-                  Post Notice to Supabase
+                  {editingNoticeId ? 'Update Notice' : 'Post Notice'}
                 </button>
               </form>
             </div>
@@ -1188,16 +2137,27 @@ export const AdminView: React.FC = () => {
                           {n.category}
                         </span>
                         <span className="text-[11px] text-stone-400">{n.date}</span>
+                        {n.postedBy && <span className="text-[11px] text-stone-500">• {n.postedBy}</span>}
                       </div>
-                      <button
-                        onClick={() => {
-                          deleteNotice(n.id);
-                          showToast('success', 'Notice removed.');
-                        }}
-                        className="text-stone-400 hover:text-rose-600 transition-colors p-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center space-x-1.5">
+                        <button
+                          onClick={() => handleEditNoticeClick(n)}
+                          className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            deleteNotice(n.id);
+                            showToast('success', 'Notice removed.');
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
                     </div>
                     <h4 className="font-bold text-slate-900 text-sm">{n.title}</h4>
                     <p className="text-xs text-stone-600">{n.content}</p>
@@ -1211,11 +2171,28 @@ export const AdminView: React.FC = () => {
         {/* TAB 6: STUDY MATERIALS */}
         {adminTab === 'materials' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-sm">
-              <h3 className="font-cinzel font-bold text-slate-900 text-lg flex items-center space-x-2">
-                <Plus className="w-5 h-5 text-blue-900" />
-                <span>Upload Study Notes</span>
-              </h3>
+            <div className="lg:col-span-1 bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-sm h-fit">
+              <div className="flex items-center justify-between">
+                <h3 className="font-cinzel font-bold text-slate-900 text-lg flex items-center space-x-2">
+                  {editingMatId ? <Edit3 className="w-5 h-5 text-amber-600" /> : <Plus className="w-5 h-5 text-blue-900" />}
+                  <span>{editingMatId ? 'Edit Study Notes' : 'Upload Study Notes'}</span>
+                </h3>
+                {editingMatId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingMatId(null);
+                      setMatTitle('');
+                      setMatSubject('');
+                      setMatDesc('');
+                      setMatUrl('');
+                    }}
+                    className="text-xs text-stone-500 hover:text-slate-900 underline cursor-pointer"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
 
               <form onSubmit={handleCreateMaterial} className="space-y-3 text-xs">
                 <div>
@@ -1226,21 +2203,37 @@ export const AdminView: React.FC = () => {
                     value={matTitle}
                     onChange={e => setMatTitle(e.target.value)}
                     placeholder="e.g. Romans Greek Exegesis Handbook"
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   />
                 </div>
 
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Target Degree</label>
-                  <select
-                    value={matCourse}
-                    onChange={e => setMatCourse(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                  >
-                    <option value="B.Th">Bachelor of Theology (B.Th)</option>
-                    <option value="M.Div">Master of Divinity (M.Div)</option>
-                    <option value="Certificate">Certificate in Biblical Studies</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Target Degree</label>
+                    <select
+                      value={matCourse}
+                      onChange={e => setMatCourse(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    >
+                      <option value="B.Th">B.Th</option>
+                      <option value="M.Div">M.Div</option>
+                      <option value="Certificate">Certificate</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Material Type</label>
+                    <select
+                      value={matType}
+                      onChange={e => setMatType(e.target.value as any)}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    >
+                      <option value="PDF">PDF</option>
+                      <option value="Syllabus">Syllabus</option>
+                      <option value="Lecture Notes">Lecture Notes</option>
+                      <option value="Handout">Handout</option>
+                      <option value="Audio / Video">Audio / Video</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
@@ -1251,25 +2244,48 @@ export const AdminView: React.FC = () => {
                     value={matSubject}
                     onChange={e => setMatSubject(e.target.value)}
                     placeholder="e.g. Biblical Greek, Systematic Theology"
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   />
                 </div>
 
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Lecturer / Author</label>
+                    <input
+                      type="text"
+                      value={matFaculty}
+                      onChange={e => setMatFaculty(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">File Size</label>
+                    <input
+                      type="text"
+                      value={matSize}
+                      onChange={e => setMatSize(e.target.value)}
+                      placeholder="e.g. 2.4 MB"
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">Lecturer / Author</label>
-                  <input
-                    type="text"
-                    value={matFaculty}
-                    onChange={e => setMatFaculty(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  <label className="block font-bold text-stone-700 mb-1">Summary / Description</label>
+                  <textarea
+                    rows={2}
+                    value={matDesc}
+                    onChange={e => setMatDesc(e.target.value)}
+                    placeholder="Brief description of study notes..."
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider transition-colors shadow"
+                  className="w-full py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider transition-colors shadow cursor-pointer"
                 >
-                  Save to Materials Table
+                  {editingMatId ? 'Update Study Notes' : 'Save Study Notes'}
                 </button>
               </form>
             </div>
@@ -1280,16 +2296,46 @@ export const AdminView: React.FC = () => {
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {studyMaterials.map(m => (
-                  <div key={m.id} className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm space-y-2">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
-                        {m.courseCode}
-                      </span>
-                      <span className="text-stone-400">{m.uploadedDate}</span>
+                  <div key={m.id} className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm space-y-3 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
+                            {m.courseCode}
+                          </span>
+                          <span className="text-stone-500 bg-stone-100 px-2 py-0.5 rounded font-semibold">
+                            {m.type}
+                          </span>
+                        </div>
+                        <span className="text-stone-400">{m.uploadedDate}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-900 text-sm">{m.title}</h4>
+                      <p className="text-xs text-stone-500">Subject: {m.subject} • {m.facultyName}</p>
+                      <p className="text-xs text-stone-600 line-clamp-2">{m.description}</p>
                     </div>
-                    <h4 className="font-bold text-slate-900 text-sm">{m.title}</h4>
-                    <p className="text-xs text-stone-500">Subject: {m.subject} • {m.facultyName}</p>
-                    <p className="text-xs text-stone-600 line-clamp-2">{m.description}</p>
+
+                    <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
+                      <span className="text-[11px] text-stone-400 font-mono">{m.fileSize}</span>
+                      <div className="flex items-center space-x-1.5">
+                        <button
+                          onClick={() => handleEditMaterialClick(m)}
+                          className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            deleteStudyMaterial(m.id);
+                            showToast('success', 'Study material deleted.');
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1300,11 +2346,28 @@ export const AdminView: React.FC = () => {
         {/* TAB 7: EVENTS */}
         {adminTab === 'events' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-sm">
-              <h3 className="font-cinzel font-bold text-slate-900 text-lg flex items-center space-x-2">
-                <Plus className="w-5 h-5 text-blue-900" />
-                <span>Schedule Event</span>
-              </h3>
+            <div className="lg:col-span-1 bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-sm h-fit">
+              <div className="flex items-center justify-between">
+                <h3 className="font-cinzel font-bold text-slate-900 text-lg flex items-center space-x-2">
+                  {editingEventId ? <Edit3 className="w-5 h-5 text-amber-600" /> : <Plus className="w-5 h-5 text-blue-900" />}
+                  <span>{editingEventId ? 'Edit Event' : 'Schedule Event'}</span>
+                </h3>
+                {editingEventId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingEventId(null);
+                      setEventTitle('');
+                      setEventDate('');
+                      setEventSpeaker('');
+                      setEventDesc('');
+                    }}
+                    className="text-xs text-stone-500 hover:text-slate-900 underline cursor-pointer"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
 
               <form onSubmit={handleCreateEvent} className="space-y-3 text-xs">
                 <div>
@@ -1315,19 +2378,58 @@ export const AdminView: React.FC = () => {
                     value={eventTitle}
                     onChange={e => setEventTitle(e.target.value)}
                     placeholder="e.g. Annual Mission & Church Growth Conference"
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   />
                 </div>
 
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={eventDate}
-                    onChange={e => setEventDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Date *</label>
+                    <input
+                      type="text"
+                      required
+                      value={eventDate}
+                      onChange={e => setEventDate(e.target.value)}
+                      placeholder="e.g. 2026-08-15"
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Category</label>
+                    <select
+                      value={eventCategory}
+                      onChange={e => setEventCategory(e.target.value as any)}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    >
+                      <option value="Conference">Conference</option>
+                      <option value="Chapel">Chapel</option>
+                      <option value="Convocation">Convocation</option>
+                      <option value="Outreach">Outreach</option>
+                      <option value="Seminar">Seminar</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Time</label>
+                    <input
+                      type="text"
+                      value={eventTime}
+                      onChange={e => setEventTime(e.target.value)}
+                      placeholder="9:30 AM – 4:00 PM"
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Venue / Location</label>
+                    <input
+                      type="text"
+                      value={eventLocation}
+                      onChange={e => setEventLocation(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -1336,16 +2438,38 @@ export const AdminView: React.FC = () => {
                     type="text"
                     value={eventSpeaker}
                     onChange={e => setEventSpeaker(e.target.value)}
-                    placeholder="e.g. Bishop Dr. Samuel John"
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    placeholder="e.g. Pr. Christopher"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Banner Image URL</label>
+                  <input
+                    type="text"
+                    value={eventImage}
+                    onChange={e => setEventImage(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Event Description</label>
+                  <textarea
+                    rows={3}
+                    value={eventDesc}
+                    onChange={e => setEventDesc(e.target.value)}
+                    placeholder="Event schedule and details..."
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider transition-colors shadow"
+                  className="w-full py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider transition-colors shadow cursor-pointer"
                 >
-                  Publish Event
+                  {editingEventId ? 'Update Event' : 'Publish Event'}
                 </button>
               </form>
             </div>
@@ -1356,14 +2480,323 @@ export const AdminView: React.FC = () => {
                 {events.map(ev => (
                   <div key={ev.id} className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm space-y-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded">
-                        {ev.category}
-                      </span>
-                      <span className="text-stone-500 font-mono">{ev.date} • {ev.time}</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded">
+                          {ev.category}
+                        </span>
+                        <span className="text-stone-500 font-mono">{ev.date} • {ev.time}</span>
+                      </div>
+                      <div className="flex items-center space-x-1.5">
+                        <button
+                          onClick={() => handleEditEventClick(ev)}
+                          className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            deleteEvent(ev.id);
+                            showToast('success', 'Event deleted.');
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
                     </div>
                     <h4 className="font-bold text-slate-900 text-base">{ev.title}</h4>
                     <p className="text-xs text-stone-600">Location: {ev.location} | Speaker: {ev.speaker}</p>
                     <p className="text-xs text-stone-500">{ev.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 8: GALLERY */}
+        {adminTab === 'gallery' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1 bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-sm h-fit">
+              <div className="flex items-center justify-between">
+                <h3 className="font-cinzel font-bold text-slate-900 text-lg flex items-center space-x-2">
+                  {editingGalleryId ? <Edit3 className="w-5 h-5 text-amber-600" /> : <Plus className="w-5 h-5 text-blue-900" />}
+                  <span>{editingGalleryId ? 'Edit Gallery Photo' : 'Add Gallery Photo'}</span>
+                </h3>
+                {editingGalleryId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingGalleryId(null);
+                      setGalTitle('');
+                      setGalImage('');
+                      setGalCaption('');
+                    }}
+                    className="text-xs text-stone-500 hover:text-slate-900 underline cursor-pointer"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
+
+              <form onSubmit={handleSaveGallery} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Photo Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={galTitle}
+                    onChange={e => setGalTitle(e.target.value)}
+                    placeholder="e.g. Convocation Ceremony 2025"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Category</label>
+                  <select
+                    value={galCategory}
+                    onChange={e => setGalCategory(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  >
+                    <option value="Campus">Campus</option>
+                    <option value="Chapel">Chapel</option>
+                    <option value="Graduation">Graduation</option>
+                    <option value="Library">Library</option>
+                    <option value="Mission">Mission</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Image URL or Upload Photo *</label>
+                  <input
+                    type="text"
+                    required
+                    value={galImage}
+                    onChange={e => setGalImage(e.target.value)}
+                    placeholder="Paste image URL or upload below..."
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900 mb-2"
+                  />
+                  <label className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-slate-800 font-semibold text-[11px] cursor-pointer">
+                    <UploadCloud className="w-3.5 h-3.5" />
+                    <span>Choose Image File from Computer</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async e => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          const res = await uploadFileToStorage('gallery', f);
+                          if (res.url) {
+                            setGalImage(res.url);
+                            showToast('success', 'Photo loaded for gallery.');
+                          }
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Caption / Description</label>
+                  <textarea
+                    rows={3}
+                    value={galCaption}
+                    onChange={e => setGalCaption(e.target.value)}
+                    placeholder="Describe this campus moment..."
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider transition-colors shadow cursor-pointer"
+                >
+                  {editingGalleryId ? 'Update Photo' : 'Add Photo to Gallery'}
+                </button>
+              </form>
+            </div>
+
+            <div className="lg:col-span-2 space-y-4">
+              <h3 className="font-cinzel font-bold text-slate-900 text-lg">Campus Photo Gallery ({gallery.length})</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {gallery.map(g => (
+                  <div key={g.id} className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="h-44 bg-stone-100 relative overflow-hidden">
+                        <img src={g.image} alt={g.title} className="w-full h-full object-cover" />
+                        <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-slate-950/80 text-amber-300 text-[10px] font-bold uppercase">
+                          {g.category}
+                        </span>
+                      </div>
+                      <div className="p-4 space-y-1">
+                        <h4 className="font-bold text-slate-900 text-sm">{g.title}</h4>
+                        <p className="text-xs text-stone-500 line-clamp-2">{g.caption}</p>
+                      </div>
+                    </div>
+
+                    <div className="px-4 py-3 border-t border-stone-100 flex items-center justify-end space-x-2 bg-stone-50/50">
+                      <button
+                        onClick={() => handleEditGalleryClick(g)}
+                        className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          deleteGalleryPhoto(g.id);
+                          showToast('success', 'Gallery photo deleted.');
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 9: DOWNLOADS */}
+        {adminTab === 'downloads' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1 bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-sm h-fit">
+              <div className="flex items-center justify-between">
+                <h3 className="font-cinzel font-bold text-slate-900 text-lg flex items-center space-x-2">
+                  {editingDownloadId ? <Edit3 className="w-5 h-5 text-amber-600" /> : <Plus className="w-5 h-5 text-blue-900" />}
+                  <span>{editingDownloadId ? 'Edit Document' : 'Add Download Document'}</span>
+                </h3>
+                {editingDownloadId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingDownloadId(null);
+                      setDlTitle('');
+                      setDlDesc('');
+                    }}
+                    className="text-xs text-stone-500 hover:text-slate-900 underline cursor-pointer"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
+
+              <form onSubmit={handleSaveDownload} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Document Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={dlTitle}
+                    onChange={e => setDlTitle(e.target.value)}
+                    placeholder="e.g. 2026–2027 Academic Prospectus"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Category</label>
+                    <select
+                      value={dlCategory}
+                      onChange={e => setDlCategory(e.target.value as any)}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    >
+                      <option value="Forms">Forms</option>
+                      <option value="Prospectus">Prospectus</option>
+                      <option value="Academic">Academic</option>
+                      <option value="Rules">Rules</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Format</label>
+                    <select
+                      value={dlFormat}
+                      onChange={e => setDlFormat(e.target.value as any)}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    >
+                      <option value="PDF">PDF</option>
+                      <option value="DOCX">DOCX</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">File Size</label>
+                  <input
+                    type="text"
+                    value={dlSize}
+                    onChange={e => setDlSize(e.target.value)}
+                    placeholder="e.g. 1.8 MB"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Description</label>
+                  <textarea
+                    rows={3}
+                    value={dlDesc}
+                    onChange={e => setDlDesc(e.target.value)}
+                    placeholder="Details included in this downloadable document..."
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider transition-colors shadow cursor-pointer"
+                >
+                  {editingDownloadId ? 'Update Document' : 'Add Document'}
+                </button>
+              </form>
+            </div>
+
+            <div className="lg:col-span-2 space-y-4">
+              <h3 className="font-cinzel font-bold text-slate-900 text-lg">Official College Downloads ({downloads.length})</h3>
+              <div className="space-y-3">
+                {downloads.map(d => (
+                  <div key={d.id} className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2 text-[11px]">
+                        <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-bold uppercase">
+                          {d.category}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-stone-100 text-stone-600 font-mono">
+                          {d.format} • {d.fileSize}
+                        </span>
+                        <span className="text-stone-400">Updated: {d.updatedAt}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-900 text-sm">{d.title}</h4>
+                      <p className="text-xs text-stone-500">{d.description}</p>
+                    </div>
+
+                    <div className="flex items-center space-x-1.5 shrink-0">
+                      <button
+                        onClick={() => handleEditDownloadClick(d)}
+                        className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          deleteDownload(d.id);
+                          showToast('success', 'Download item deleted.');
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1450,9 +2883,24 @@ export const AdminView: React.FC = () => {
 
               {/* Uploaded Files Table */}
               <div className="space-y-3">
-                <h4 className="font-cinzel text-base font-bold text-slate-900">
-                  Uploaded Assets ({uploadedFiles.length})
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-cinzel text-base font-bold text-slate-900">
+                    Uploaded Assets ({uploadedFiles.length})
+                  </h4>
+                  <button
+                    onClick={() => {
+                      setEditingFileIndex(null);
+                      setFileFormName('');
+                      setFileFormUrl('');
+                      setFileFormSize('1.2 MB');
+                      setShowAddFileModal(true);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add File / URL</span>
+                  </button>
+                </div>
                 <div className="divide-y divide-stone-100 rounded-2xl border border-stone-200 overflow-hidden bg-white text-xs">
                   {uploadedFiles.map((file, i) => (
                     <div key={i} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-stone-50">
@@ -1466,7 +2914,7 @@ export const AdminView: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(file.url);
@@ -1474,20 +2922,44 @@ export const AdminView: React.FC = () => {
                             showToast('success', 'Public CDN URL copied to clipboard!');
                             setTimeout(() => setCopiedUrl(null), 2500);
                           }}
-                          className="px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-slate-800 font-semibold text-[11px] flex items-center space-x-1"
+                          className="px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-slate-800 font-semibold text-[11px] flex items-center space-x-1 cursor-pointer"
                         >
                           {copiedUrl === file.url ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{copiedUrl === file.url ? 'Copied' : 'Copy Public URL'}</span>
+                          <span>{copiedUrl === file.url ? 'Copied' : 'Copy URL'}</span>
                         </button>
                         <a
                           href={file.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] flex items-center space-x-1"
+                          className="px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-slate-800 font-semibold text-[11px] flex items-center space-x-1"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                           <span>View</span>
                         </a>
+                        <button
+                          onClick={() => {
+                            setEditingFileIndex(i);
+                            setFileFormName(file.name);
+                            setFileFormUrl(file.url);
+                            setFileFormSize(file.size);
+                            setSelectedBucket(file.bucket);
+                            setShowAddFileModal(true);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            deleteUploadedFile(i);
+                            showToast('success', 'File removed from storage list.');
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1743,21 +3215,35 @@ export const AdminView: React.FC = () => {
         {/* TAB 10: INQUIRIES & PRAYER REQUESTS */}
         {adminTab === 'messages' && (
           <div className="space-y-4">
-            <h3 className="font-cinzel font-bold text-slate-900 text-lg">
-              Campus Contact & Prayer Messages ({contactMessages.length})
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-cinzel font-bold text-slate-900 text-lg">
+                  Campus Contact & Prayer Messages ({contactMessages.length})
+                </h3>
+                <p className="text-xs text-stone-500">
+                  Add, edit, mark answered, or delete visitor inquiries and prayer requests.
+                </p>
+              </div>
+              <button
+                onClick={openAddMessageModal}
+                className="px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Inquiry / Prayer</span>
+              </button>
+            </div>
             <div className="space-y-3">
               {contactMessages.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center text-stone-400 space-y-2 shadow-sm">
                   <MessageSquare className="w-8 h-8 text-stone-300 mx-auto mb-1" />
                   <p className="font-semibold text-slate-700 text-sm">No incoming inquiries or messages yet.</p>
-                  <p className="text-xs text-stone-400">Public messages submitted via the Contact Us page or Prayer Petitions will appear here.</p>
+                  <p className="text-xs text-stone-400">Click "Add Inquiry / Prayer" above or submit via the Contact Us page.</p>
                 </div>
               ) : (
                 contactMessages.map(msg => (
                   <div key={msg.id} className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center space-x-2 flex-wrap">
                         {msg.isPrayerRequest && (
                           <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">
                             Prayer Request
@@ -1774,13 +3260,30 @@ export const AdminView: React.FC = () => {
                             markMessageAnswered(msg.id);
                             showToast('success', 'Message marked as prayed/answered.');
                           }}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-colors ${
+                          className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
                             msg.status === 'Prayed / Answered'
                               ? 'bg-emerald-100 text-emerald-800'
                               : 'bg-stone-200 hover:bg-stone-300 text-stone-700'
                           }`}
                         >
                           {msg.status}
+                        </button>
+                        <button
+                          onClick={() => openEditMessageModal(msg)}
+                          className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            deleteContactMessage(msg.id);
+                            showToast('success', 'Inquiry deleted.');
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
                         </button>
                       </div>
                     </div>
@@ -2067,54 +3570,242 @@ export const AdminView: React.FC = () => {
 
       </div>
 
-      {/* MODAL: ADD STUDENT */}
+      {/* MODAL: ADD / EDIT APPLICATION */}
+      {showAppModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <h3 className="font-cinzel text-xl font-bold text-slate-900">
+                {editingAppId ? 'Edit Admission Application' : 'Add New Admission Application'}
+              </h3>
+              <button
+                onClick={() => setShowAppModal(false)}
+                className="text-stone-400 hover:text-stone-600 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveApp} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={appFormName}
+                    onChange={e => setAppFormName(e.target.value)}
+                    placeholder="Applicant Full Name"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={appFormEmail}
+                    onChange={e => setAppFormEmail(e.target.value)}
+                    placeholder="applicant@example.com"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Phone</label>
+                  <input
+                    type="text"
+                    value={appFormPhone}
+                    onChange={e => setAppFormPhone(e.target.value)}
+                    placeholder="+91 95004 23126"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Date of Birth</label>
+                  <input
+                    type="text"
+                    value={appFormDob}
+                    onChange={e => setAppFormDob(e.target.value)}
+                    placeholder="YYYY-MM-DD"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Gender</label>
+                  <select
+                    value={appFormGender}
+                    onChange={e => setAppFormGender(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Target Course</label>
+                  <select
+                    value={appFormCourseId}
+                    onChange={e => setAppFormCourseId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  >
+                    <option value="bth">Bachelor of Theology (bth)</option>
+                    <option value="mdiv">Master of Divinity (mdiv)</option>
+                    <option value="cert">Certificate in Theology (cert)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Previous Education</label>
+                  <input
+                    type="text"
+                    value={appFormEducation}
+                    onChange={e => setAppFormEducation(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Home Church</label>
+                  <input
+                    type="text"
+                    value={appFormChurch}
+                    onChange={e => setAppFormChurch(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Pastor Name</label>
+                  <input
+                    type="text"
+                    value={appFormPastor}
+                    onChange={e => setAppFormPastor(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Pastor Phone</label>
+                  <input
+                    type="text"
+                    value={appFormPastorPhone}
+                    onChange={e => setAppFormPastorPhone(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Ministry Calling</label>
+                  <input
+                    type="text"
+                    value={appFormCalling}
+                    onChange={e => setAppFormCalling(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Application Status</label>
+                  <select
+                    value={appFormStatus}
+                    onChange={e => setAppFormStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  >
+                    <option value="Under Review">Under Review</option>
+                    <option value="Interview Scheduled">Interview Scheduled</option>
+                    <option value="Admitted">Admitted</option>
+                    <option value="Pending Documents">Pending Documents</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Personal Testimony</label>
+                <textarea
+                  rows={3}
+                  value={appFormTestimony}
+                  onChange={e => setAppFormTestimony(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAppModal(false)}
+                  className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider shadow cursor-pointer"
+                >
+                  {editingAppId ? 'Update Application' : 'Save Application'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD / EDIT STUDENT */}
       {showAddStudentModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl animate-in zoom-in-95">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <h3 className="font-cinzel text-xl font-bold text-slate-900">Register New Student</h3>
+              <h3 className="font-cinzel text-xl font-bold text-slate-900">
+                {editingStudentId ? 'Edit Student Profile' : 'Register New Student'}
+              </h3>
               <button
                 onClick={() => setShowAddStudentModal(false)}
-                className="text-stone-400 hover:text-stone-600 font-bold"
+                className="text-stone-400 hover:text-stone-600 font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <form onSubmit={handleAddStudentSubmit} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Full Legal Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={newStdName}
-                  onChange={e => setNewStdName(e.target.value)}
-                  placeholder="e.g. Stephen Paul"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Full Legal Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newStdName}
+                    onChange={e => setNewStdName(e.target.value)}
+                    placeholder="e.g. Stephen Paul"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Registration No.</label>
+                  <input
+                    type="text"
+                    value={newStdRegNo}
+                    onChange={e => setNewStdRegNo(e.target.value)}
+                    placeholder="Auto-generated if blank"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Student Email *</label>
-                <input
-                  type="email"
-                  required
-                  value={newStdEmail}
-                  onChange={e => setNewStdEmail(e.target.value)}
-                  placeholder="e.g. stephen.paul@student.icbc.ac.in"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Contact Phone</label>
-                <input
-                  type="text"
-                  value={newStdPhone}
-                  onChange={e => setNewStdPhone(e.target.value)}
-                  placeholder="+91 98400 12345"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Student Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={newStdEmail}
+                    onChange={e => setNewStdEmail(e.target.value)}
+                    placeholder="e.g. stephen@student.icbc.ac.in"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Contact Phone</label>
+                  <input
+                    type="text"
+                    value={newStdPhone}
+                    onChange={e => setNewStdPhone(e.target.value)}
+                    placeholder="+91 98400 12345"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -2123,7 +3814,7 @@ export const AdminView: React.FC = () => {
                   <select
                     value={newStdCourse}
                     onChange={e => setNewStdCourse(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   >
                     <option value="bth">Bachelor of Theology (B.Th)</option>
                     <option value="mdiv">Master of Divinity (M.Div)</option>
@@ -2137,24 +3828,678 @@ export const AdminView: React.FC = () => {
                     type="text"
                     value={newStdYear}
                     onChange={e => setNewStdYear(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Batch</label>
+                  <input
+                    type="text"
+                    value={newStdBatch}
+                    onChange={e => setNewStdBatch(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">GPA</label>
+                  <input
+                    type="text"
+                    value={newStdGpa}
+                    onChange={e => setNewStdGpa(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Attendance %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={newStdAttendance}
+                    onChange={e => setNewStdAttendance(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Profile Photo URL</label>
+                <input
+                  type="text"
+                  value={newStdAvatar}
+                  onChange={e => setNewStdAvatar(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
               </div>
 
               <div className="flex justify-end space-x-2 pt-3">
                 <button
                   type="button"
                   onClick={() => setShowAddStudentModal(false)}
-                  className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold"
+                  className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider shadow"
+                  className="px-5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider shadow cursor-pointer"
                 >
-                  Save Student to Database
+                  {editingStudentId ? 'Update Student' : 'Save Student'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD / EDIT FACULTY */}
+      {showFacultyModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <h3 className="font-cinzel text-xl font-bold text-slate-900">
+                {editingFacultyId ? 'Edit Faculty Member' : 'Add Faculty Member'}
+              </h3>
+              <button
+                onClick={() => setShowFacultyModal(false)}
+                className="text-stone-400 hover:text-stone-600 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFaculty} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={facName}
+                    onChange={e => setFacName(e.target.value)}
+                    placeholder="e.g. Rev. Dr. Thomas Paul"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Role / Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={facRole}
+                    onChange={e => setFacRole(e.target.value)}
+                    placeholder="Professor of Theology"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Department</label>
+                <input
+                  type="text"
+                  value={facDept}
+                  onChange={e => setFacDept(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Degrees</label>
+                  <input
+                    type="text"
+                    value={facDegrees}
+                    onChange={e => setFacDegrees(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Alma Mater</label>
+                  <input
+                    type="text"
+                    value={facAlmaMater}
+                    onChange={e => setFacAlmaMater(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Years Exp.</label>
+                  <input
+                    type="number"
+                    value={facExp}
+                    onChange={e => setFacExp(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Subjects Taught (comma-separated)</label>
+                <input
+                  type="text"
+                  value={facSubjects}
+                  onChange={e => setFacSubjects(e.target.value)}
+                  placeholder="Systematic Theology, Homiletics"
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Photo URL</label>
+                <input
+                  type="text"
+                  value={facPhoto}
+                  onChange={e => setFacPhoto(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Biography</label>
+                <textarea
+                  rows={3}
+                  value={facBio}
+                  onChange={e => setFacBio(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowFacultyModal(false)}
+                  className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider shadow cursor-pointer"
+                >
+                  {editingFacultyId ? 'Update Faculty' : 'Save Faculty'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD / EDIT COURSE */}
+      {showCourseModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <h3 className="font-cinzel text-xl font-bold text-slate-900">
+                {editingCourseId ? 'Edit Degree Course' : 'Add New Degree Course'}
+              </h3>
+              <button
+                onClick={() => setShowCourseModal(false)}
+                className="text-stone-400 hover:text-stone-600 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCourse} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Course Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={crsCode}
+                    onChange={e => setCrsCode(e.target.value)}
+                    placeholder="e.g. B.Th or Dip.Th"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Level</label>
+                  <select
+                    value={crsLevel}
+                    onChange={e => setCrsLevel(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  >
+                    <option value="Certificate">Certificate</option>
+                    <option value="Diploma">Diploma</option>
+                    <option value="Bachelor">Bachelor</option>
+                    <option value="Master">Master</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Course Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={crsTitle}
+                  onChange={e => setCrsTitle(e.target.value)}
+                  placeholder="e.g. Bachelor of Theology"
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Duration</label>
+                  <input
+                    type="text"
+                    value={crsDuration}
+                    onChange={e => setCrsDuration(e.target.value)}
+                    placeholder="3 Years"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Study Mode</label>
+                  <select
+                    value={crsMode}
+                    onChange={e => setCrsMode(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  >
+                    <option value="Residential & Day Scholar">Residential & Day Scholar</option>
+                    <option value="Full-Time Residential">Full-Time Residential</option>
+                    <option value="Weekend / Evening">Weekend / Evening</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Total Credits</label>
+                  <input
+                    type="number"
+                    value={crsCredits}
+                    onChange={e => setCrsCredits(Number(e.target.value))}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Annual Tuition</label>
+                  <input
+                    type="text"
+                    value={crsTuition}
+                    onChange={e => setCrsTuition(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Eligibility</label>
+                <input
+                  type="text"
+                  value={crsEligibility}
+                  onChange={e => setCrsEligibility(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Course Description</label>
+                <textarea
+                  rows={3}
+                  value={crsDesc}
+                  onChange={e => setCrsDesc(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCourseModal(false)}
+                  className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider shadow cursor-pointer"
+                >
+                  {editingCourseId ? 'Update Course' : 'Save Course'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD / EDIT SUBJECT */}
+      {showSubjectModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <h3 className="font-cinzel text-xl font-bold text-slate-900">
+                {editingSubjectId ? 'Edit Curriculum Subject' : 'Add Curriculum Subject'}
+              </h3>
+              <button
+                onClick={() => setShowSubjectModal(false)}
+                className="text-stone-400 hover:text-stone-600 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSubject} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Subject Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={subCode}
+                    onChange={e => setSubCode(e.target.value)}
+                    placeholder="TH-105"
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Degree Program</label>
+                  <select
+                    value={subCourseId}
+                    onChange={e => setSubCourseId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  >
+                    <option value="bth">B.Th (bth)</option>
+                    <option value="mdiv">M.Div (mdiv)</option>
+                    <option value="cert">Certificate (cert)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Subject Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={subName}
+                  onChange={e => setSubName(e.target.value)}
+                  placeholder="e.g. Systematic Theology I"
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Semester / Year</label>
+                  <input
+                    type="text"
+                    value={subSemester}
+                    onChange={e => setSubSemester(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Credit Hours</label>
+                  <input
+                    type="number"
+                    value={subCredits}
+                    onChange={e => setSubCredits(Number(e.target.value))}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Assigned Faculty</label>
+                <input
+                  type="text"
+                  value={subFaculty}
+                  onChange={e => setSubFaculty(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSubjectModal(false)}
+                  className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider shadow cursor-pointer"
+                >
+                  {editingSubjectId ? 'Update Subject' : 'Save Subject'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD / EDIT INQUIRY OR PRAYER REQUEST */}
+      {showMessageModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <h3 className="font-cinzel text-xl font-bold text-slate-900">
+                {editingMsgId ? 'Edit Inquiry / Prayer Request' : 'Add Inquiry / Prayer Request'}
+              </h3>
+              <button
+                onClick={() => setShowMessageModal(false)}
+                className="text-stone-400 hover:text-stone-600 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveMessage} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Sender Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={msgName}
+                    onChange={e => setMsgName(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Phone</label>
+                  <input
+                    type="text"
+                    value={msgPhone}
+                    onChange={e => setMsgPhone(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={msgEmail}
+                    onChange={e => setMsgEmail(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Status</label>
+                  <select
+                    value={msgStatus}
+                    onChange={e => setMsgStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  >
+                    <option value="New">New</option>
+                    <option value="Prayed / Answered">Prayed / Answered</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Subject</label>
+                <input
+                  type="text"
+                  value={msgSubject}
+                  onChange={e => setMsgSubject(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Message / Prayer Petition *</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={msgContent}
+                  onChange={e => setMsgContent(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isPrayerCheck"
+                  checked={msgIsPrayer}
+                  onChange={e => setMsgIsPrayer(e.target.checked)}
+                />
+                <label htmlFor="isPrayerCheck" className="font-semibold text-rose-700">
+                  Mark as Prayer Request
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowMessageModal(false)}
+                  className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider shadow cursor-pointer"
+                >
+                  {editingMsgId ? 'Update Message' : 'Save Message'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD / EDIT STORAGE FILE */}
+      {showAddFileModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <h3 className="font-cinzel text-xl font-bold text-slate-900">
+                {editingFileIndex !== null ? 'Edit Storage File Record' : 'Add Storage File Record'}
+              </h3>
+              <button
+                onClick={() => setShowAddFileModal(false)}
+                className="text-stone-400 hover:text-stone-600 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                if (!fileFormName.trim() || !fileFormUrl.trim()) {
+                  showToast('error', 'Please enter file name and URL.');
+                  return;
+                }
+                if (editingFileIndex !== null) {
+                  updateUploadedFile(editingFileIndex, {
+                    name: fileFormName,
+                    url: fileFormUrl,
+                    size: fileFormSize,
+                    bucket: selectedBucket
+                  });
+                  showToast('success', 'Storage file record updated.');
+                } else {
+                  addUploadedFileManual({
+                    name: fileFormName,
+                    url: fileFormUrl,
+                    size: fileFormSize || '1.0 MB',
+                    bucket: selectedBucket,
+                    uploadedAt: new Date().toISOString().split('T')[0]
+                  });
+                  showToast('success', 'Storage file record added.');
+                }
+                setShowAddFileModal(false);
+                setEditingFileIndex(null);
+              }}
+              className="space-y-3.5 text-xs"
+            >
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">File Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={fileFormName}
+                  onChange={e => setFileFormName(e.target.value)}
+                  placeholder="e.g. ICBC-2026-Brochure.pdf"
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Bucket</label>
+                <select
+                  value={selectedBucket}
+                  onChange={e => setSelectedBucket(e.target.value as StorageBucket)}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                >
+                  {ALL_STORAGE_BUCKETS.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Public File URL *</label>
+                <input
+                  type="text"
+                  required
+                  value={fileFormUrl}
+                  onChange={e => setFileFormUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">File Size</label>
+                <input
+                  type="text"
+                  value={fileFormSize}
+                  onChange={e => setFileFormSize(e.target.value)}
+                  placeholder="1.2 MB"
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddFileModal(false)}
+                  className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider shadow cursor-pointer"
+                >
+                  {editingFileIndex !== null ? 'Update File' : 'Save File'}
                 </button>
               </div>
             </form>
@@ -2171,16 +4516,40 @@ export const AdminView: React.FC = () => {
                 <span className="font-mono text-xs text-amber-800 font-bold">{inspectedApp.applicationNo}</span>
                 <h3 className="font-cinzel text-xl font-bold text-slate-900">{inspectedApp.fullName}</h3>
               </div>
-              <button
-                onClick={() => setInspectedApp(null)}
-                className="text-stone-400 hover:text-stone-600 font-bold text-lg"
-              >
-                ✕
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    const appToEdit = inspectedApp;
+                    setInspectedApp(null);
+                    openEditAppModal(appToEdit);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-xs inline-flex items-center space-x-1 cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit</span>
+                </button>
+                <button
+                  onClick={() => {
+                    deleteApplication(inspectedApp.id);
+                    setInspectedApp(null);
+                    showToast('success', 'Application deleted.');
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs inline-flex items-center space-x-1 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
+                </button>
+                <button
+                  onClick={() => setInspectedApp(null)}
+                  className="text-stone-400 hover:text-stone-600 font-bold text-lg pl-2 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3 bg-stone-50 p-4 rounded-2xl">
+              <div className="grid grid-cols-2 gap-3 bg-stone-50 p-4 rounded-2xl text-slate-800">
                 <div><strong>Email:</strong> {inspectedApp.email}</div>
                 <div><strong>Phone:</strong> {inspectedApp.phone}</div>
                 <div><strong>Date of Birth:</strong> {inspectedApp.dateOfBirth}</div>
@@ -2191,7 +4560,7 @@ export const AdminView: React.FC = () => {
 
               <div>
                 <h4 className="font-bold text-slate-800 uppercase tracking-wider mb-1">Local Church & Pastoral Reference</h4>
-                <div className="bg-stone-50 p-4 rounded-2xl space-y-1">
+                <div className="bg-stone-50 p-4 rounded-2xl space-y-1 text-slate-800">
                   <div><strong>Home Church:</strong> {inspectedApp.homeChurch}</div>
                   <div><strong>Pastor:</strong> {inspectedApp.pastorName} ({inspectedApp.pastorPhone})</div>
                 </div>
@@ -2215,7 +4584,7 @@ export const AdminView: React.FC = () => {
                         setInspectedApp(prev => (prev ? { ...prev, status: st as any } : null));
                         showToast('success', `Application status changed to ${st}`);
                       }}
-                      className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                      className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
                         inspectedApp.status === st
                           ? 'bg-blue-900 text-amber-300 shadow'
                           : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
