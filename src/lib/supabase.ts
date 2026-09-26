@@ -15,13 +15,18 @@ export function getSavedSupabaseConfig(): { url: string; key: string } {
   const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
   const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
-  const storedUrl = localStorage.getItem(SUPABASE_STORAGE_URL_KEY) || envUrl;
+  const defaultOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  const storedUrl = localStorage.getItem(SUPABASE_STORAGE_URL_KEY) || envUrl || defaultOrigin;
   const storedKey = localStorage.getItem(SUPABASE_STORAGE_KEY_KEY) || envKey || DEFAULT_SUPABASE_KEY;
 
   return {
     url: storedUrl.trim(),
     key: storedKey.trim()
   };
+}
+
+export function isExternalSupabaseUrl(url: string): boolean {
+  return Boolean(url && url.includes('.supabase.co'));
 }
 
 export function saveSupabaseConfig(url: string, key: string) {

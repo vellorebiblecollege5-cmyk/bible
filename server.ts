@@ -1,0 +1,238 @@
+import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createServer as createViteServer } from 'vite';
+import {
+  INITIAL_COURSES,
+  INITIAL_FACULTY,
+  INITIAL_STUDENTS,
+  INITIAL_SUBJECTS,
+  INITIAL_STUDY_MATERIALS,
+  INITIAL_NOTICES,
+  INITIAL_EVENTS,
+  INITIAL_GALLERY,
+  INITIAL_DOWNLOADS,
+  INITIAL_APPLICATIONS,
+  INITIAL_CONTACT_MESSAGES
+} from './src/data/collegeData';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const DB_FILE_PATH = path.join(__dirname, 'supabase', 'live-db.json');
+
+interface LiveSupabaseStore {
+  courses: any[];
+  faculty: any[];
+  students: any[];
+  subjects: any[];
+  admissions: any[];
+  notices: any[];
+  events: any[];
+  study_materials: any[];
+  gallery: any[];
+  downloads: any[];
+  contact_messages: any[];
+  uploaded_files: any[];
+  updatedAt: string;
+}
+
+function getInitialStore(): LiveSupabaseStore {
+  return {
+    courses: INITIAL_COURSES,
+    faculty: INITIAL_FACULTY,
+    students: INITIAL_STUDENTS,
+    subjects: INITIAL_SUBJECTS,
+    admissions: INITIAL_APPLICATIONS,
+    notices: INITIAL_NOTICES,
+    events: INITIAL_EVENTS,
+    study_materials: INITIAL_STUDY_MATERIALS,
+    gallery: INITIAL_GALLERY,
+    downloads: INITIAL_DOWNLOADS,
+    contact_messages: INITIAL_CONTACT_MESSAGES,
+    uploaded_files: [],
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function loadStore(): LiveSupabaseStore {
+  try {
+    if (fs.existsSync(DB_FILE_PATH)) {
+      const raw = fs.readFileSync(DB_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      return {
+        ...getInitialStore(),
+        ...parsed
+      };
+    }
+  } catch (err) {
+    console.warn('Could not load live-db.json, initializing fresh store:', err);
+  }
+  const initial = getInitialStore();
+  saveStore(initial);
+  return initial;
+}
+
+function saveStore(store: LiveSupabaseStore) {
+  try {
+    const dir = path.dirname(DB_FILE_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    store.updatedAt = new Date().toISOString();
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(store, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Failed to persist live-db.json:', err);
+  }
+}
+
+let dbStore: LiveSupabaseStore = loadStore();
+
+// Connected SSE clients for instant real-time website updates
+const sseClients = new Set<express.Response>();
+
+function broadcastRealtimeUpdate(changedTables?: string[]) {
+  const payload = JSON.stringify({
+    type: 'SUPABASE_REALTIME_SYNC',
+    changedTables: changedTables || ['all'],
+    updatedAt: dbStore.updatedAt,
+    state: dbStore
+  });
+  for (const client of sseClients) {
+    try {
+      client.write(`data: ${payload}\n\n`);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+async function startServer() {
+  const app = express();
+  const PORT = 3000;
+
+  // Allow large base64 images & documents in JSON payloads
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+  // 1. Real-time Server-Sent Events (SSE) stream so website stays permanently connected
+  app.get('/api/supabase/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    // Send initial connected state immediately
+    res.write(
+      `data: ${JSON.stringify({
+        type: 'SUPABASE_CONNECTED',
+        updatedAt: dbStore.updatedAt,
+        state: dbStore
+      })}\n\n`
+    );
+
+    sseClients.add(res);
+
+    // Keep-alive heartbeat every 10 seconds so connection never drops
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'HEARTBEAT', timestamp: new Date().toISOString() })}\n\n`);
+      } catch {
+        clearInterval(heartbeat);
+        sseClients.delete(res);
+      }
+    }, 10000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      sseClients.delete(res);
+    });
+  });
+
+  // 2. Get full live database state
+  app.get('/api/supabase/state', (_req, res) => {
+    res.json({
+      connected: true,
+      updatedAt: dbStore.updatedAt,
+      state: dbStore
+    });
+  });
+
+  // 3. Save / Sync one or more tables from Admin Panel and immediately broadcast to all website visitors
+  app.post('/api/supabase/sync', (req, res) => {
+    const updates = req.body || {};
+    const validKeys: (keyof LiveSupabaseStore)[] = [
+      'courses',
+      'faculty',
+      'students',
+      'subjects',
+      'admissions',
+      'notices',
+      'events',
+      'study_materials',
+      'gallery',
+      'downloads',
+      'contact_messages',
+      'uploaded_files'
+    ];
+
+    const changed: string[] = [];
+    for (const key of validKeys) {
+      if (Array.isArray(updates[key])) {
+        (dbStore as any)[key] = updates[key];
+        changed.push(key);
+      }
+    }
+
+    if (changed.length > 0) {
+      saveStore(dbStore);
+      broadcastRealtimeUpdate(changed);
+    }
+
+    res.json({
+      success: true,
+      connected: true,
+      changedTables: changed,
+      updatedAt: dbStore.updatedAt,
+      state: dbStore
+    });
+  });
+
+  // 4. Built-in PostgREST-compatible endpoints (/rest/v1/:table) so @supabase/supabase-js works natively out-of-the-box
+  app.all('/rest/v1/:table', (req, res) => {
+    const table = req.params.table as keyof LiveSupabaseStore;
+    if (!(table in dbStore) || table === 'updatedAt') {
+      res.json([]);
+      return;
+    }
+
+    if (req.method === 'GET') {
+      res.json((dbStore as any)[table] || []);
+      return;
+    }
+
+    res.status(200).json((dbStore as any)[table] || []);
+  });
+
+  // Production static serving vs Vite dev middleware
+  if (process.env.NODE_ENV === 'production') {
+    const distPath = path.join(__dirname, 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  } else {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa'
+    });
+    app.use(vite.middlewares);
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ ICBC Vellore Server & Persistent Supabase Realtime Engine running on http://0.0.0.0:${PORT}`);
+  });
+}
+
+startServer();

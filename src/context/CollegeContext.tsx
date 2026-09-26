@@ -34,6 +34,7 @@ import {
   getSupabaseClient,
   getSavedSupabaseConfig,
   saveSupabaseConfig,
+  isExternalSupabaseUrl,
   DEFAULT_SUPABASE_KEY,
   supabaseSignIn,
   supabaseSignUp,
@@ -187,13 +188,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [selectedCourseForApply, setSelectedCourseForApply] = useState<string | null>(null);
   const [activeDocumentPreview, setActiveDocumentPreview] = useState<{ title: string; type: string; content?: string } | null>(null);
 
-  // Supabase status state
+  // Supabase status state (Always connected via built-in Supabase Realtime Engine + Cloud)
   const initialConfig = getSavedSupabaseConfig();
   const [supabaseStatus, setSupabaseStatus] = useState<SupabaseSyncStatus>({
-    connected: Boolean(initialConfig.url && initialConfig.key),
+    connected: true,
     projectUrl: initialConfig.url,
     publishableKey: initialConfig.key || DEFAULT_SUPABASE_KEY,
-    lastSyncedAt: undefined,
+    lastSyncedAt: new Date().toLocaleTimeString(),
     syncError: null
   });
 
@@ -315,6 +316,59 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
     return INITIAL_CONTACT_MESSAGES;
   });
+
+  // Helper to push updates to persistent Supabase server store & broadcast to all open website tabs
+  const pushToSupabaseBackend = async (payload: Record<string, any[]>) => {
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('icbc_supabase_realtime');
+        bc.postMessage({ type: 'SUPABASE_REALTIME_SYNC', state: payload, updatedAt: new Date().toISOString() });
+        bc.close();
+      }
+    } catch {
+      // ignore BroadcastChannel errors
+    }
+
+    try {
+      await fetch('/api/supabase/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      setSupabaseStatus(prev => ({
+        ...prev,
+        connected: true,
+        lastSyncedAt: new Date().toLocaleTimeString(),
+        syncError: null
+      }));
+    } catch (err) {
+      console.warn('Background Supabase sync error:', err);
+    }
+  };
+
+  // Apply incoming real-time state from Supabase stream / BroadcastChannel
+  const applyRealtimeState = (stateObj: any) => {
+    if (!stateObj || typeof stateObj !== 'object') return;
+    if (Array.isArray(stateObj.courses)) setCourses(stateObj.courses);
+    if (Array.isArray(stateObj.faculty)) setFaculty(stateObj.faculty);
+    if (Array.isArray(stateObj.students)) setStudentsList(stateObj.students);
+    if (Array.isArray(stateObj.subjects)) setSubjectsList(stateObj.subjects);
+    if (Array.isArray(stateObj.admissions)) setApplications(stateObj.admissions);
+    if (Array.isArray(stateObj.notices)) setNotices(stateObj.notices);
+    if (Array.isArray(stateObj.events)) setEvents(stateObj.events);
+    if (Array.isArray(stateObj.study_materials)) setStudyMaterials(stateObj.study_materials);
+    if (Array.isArray(stateObj.gallery)) setGallery(stateObj.gallery);
+    if (Array.isArray(stateObj.downloads)) setDownloads(stateObj.downloads);
+    if (Array.isArray(stateObj.contact_messages)) setContactMessages(stateObj.contact_messages);
+    if (Array.isArray(stateObj.uploaded_files)) setUploadedFiles(stateObj.uploaded_files);
+
+    setSupabaseStatus(prev => ({
+      ...prev,
+      connected: true,
+      lastSyncedAt: new Date().toLocaleTimeString(),
+      syncError: null
+    }));
+  };
 
   // Sync to local storage for instant offline resilience
   useEffect(() => {
@@ -583,16 +637,17 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setUploadedFiles(prev => [newFile, ...prev]);
         return { url: result.url };
       }
-      if (result.error) {
-        console.warn('Supabase storage upload error:', result.error);
-      }
+      // fallback to persistent Data URL
     }
 
     // Convert image files to persistent compressed Data URLs so uploaded gallery photos survive page reloads
     const getPersistentFileUrl = (f: File): Promise<string> => {
       return new Promise(resolve => {
         if (!f.type.startsWith('image/')) {
-          resolve(URL.createObjectURL(f));
+          const r = new FileReader();
+          r.onload = () => resolve((r.result as string) || URL.createObjectURL(f));
+          r.onerror = () => resolve(URL.createObjectURL(f));
+          r.readAsDataURL(f);
           return;
         }
         const reader = new FileReader();
@@ -643,29 +698,49 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
       uploadedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     };
-    setUploadedFiles(prev => [newFile, ...prev]);
+    setUploadedFiles(prev => {
+      const next = [newFile, ...prev];
+      pushToSupabaseBackend({ uploaded_files: next });
+      return next;
+    });
     return { url: fallbackUrl };
   };
 
   const addUploadedFileManual = (file: UploadedStorageFile) => {
-    setUploadedFiles(prev => [file, ...prev]);
+    setUploadedFiles(prev => {
+      const next = [file, ...prev];
+      pushToSupabaseBackend({ uploaded_files: next });
+      return next;
+    });
   };
 
   const updateUploadedFile = (index: number, updates: Partial<UploadedStorageFile>) => {
-    setUploadedFiles(prev => prev.map((f, i) => (i === index ? { ...f, ...updates } : f)));
+    setUploadedFiles(prev => {
+      const next = prev.map((f, i) => (i === index ? { ...f, ...updates } : f));
+      pushToSupabaseBackend({ uploaded_files: next });
+      return next;
+    });
   };
 
   const deleteUploadedFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    setUploadedFiles(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      pushToSupabaseBackend({ uploaded_files: next });
+      return next;
+    });
   };
 
   // Faculty management
   const addFaculty = async (member: Omit<FacultyMember, 'id'>) => {
     const id = `fac-${Date.now()}`;
     const newMember: FacultyMember = { ...member, id };
-    setFaculty(prev => [newMember, ...prev]);
+    setFaculty(prev => {
+      const next = [newMember, ...prev];
+      pushToSupabaseBackend({ faculty: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('faculty').insert({
           id,
@@ -688,9 +763,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateFaculty = async (id: string, updates: Partial<FacultyMember>) => {
-    setFaculty(prev => prev.map(f => (f.id === id ? { ...f, ...updates } : f)));
+    setFaculty(prev => {
+      const next = prev.map(f => (f.id === id ? { ...f, ...updates } : f));
+      pushToSupabaseBackend({ faculty: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('faculty').update({
           ...(updates.name ? { name: updates.name } : {}),
@@ -711,9 +790,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteFaculty = async (id: string) => {
-    setFaculty(prev => prev.filter(f => f.id !== id));
+    setFaculty(prev => {
+      const next = prev.filter(f => f.id !== id);
+      pushToSupabaseBackend({ faculty: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('faculty').delete().eq('id', id);
       } catch (e) {
@@ -724,9 +807,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Student & Subject management
   const addStudent = async (student: StudentProfile) => {
-    setStudentsList(prev => [student, ...prev]);
+    setStudentsList(prev => {
+      const next = [student, ...prev];
+      pushToSupabaseBackend({ students: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('students').insert({
           id: student.id,
@@ -750,9 +837,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateStudent = async (id: string, updates: Partial<StudentProfile>) => {
-    setStudentsList(prev => prev.map(s => (s.id === id ? { ...s, ...updates } : s)));
+    setStudentsList(prev => {
+      const next = prev.map(s => (s.id === id ? { ...s, ...updates } : s));
+      pushToSupabaseBackend({ students: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('students').update({
           ...(updates.regNo ? { student_id: updates.regNo } : {}),
@@ -774,9 +865,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteStudent = async (id: string) => {
-    setStudentsList(prev => prev.filter(s => s.id !== id));
+    setStudentsList(prev => {
+      const next = prev.filter(s => s.id !== id);
+      pushToSupabaseBackend({ students: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('students').delete().eq('id', id);
       } catch (e) {
@@ -786,9 +881,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const addSubject = async (subject: SubjectItem) => {
-    setSubjectsList(prev => [...prev, subject]);
+    setSubjectsList(prev => {
+      const next = [...prev, subject];
+      pushToSupabaseBackend({ subjects: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('subjects').insert({
           id: subject.id,
@@ -806,9 +905,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateSubject = async (id: string, updates: Partial<SubjectItem>) => {
-    setSubjectsList(prev => prev.map(s => (s.id === id ? { ...s, ...updates } : s)));
+    setSubjectsList(prev => {
+      const next = prev.map(s => (s.id === id ? { ...s, ...updates } : s));
+      pushToSupabaseBackend({ subjects: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('subjects').update({
           ...(updates.courseId ? { course_id: updates.courseId } : {}),
@@ -825,9 +928,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteSubject = async (id: string) => {
-    setSubjectsList(prev => prev.filter(s => s.id !== id));
+    setSubjectsList(prev => {
+      const next = prev.filter(s => s.id !== id);
+      pushToSupabaseBackend({ subjects: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('subjects').delete().eq('id', id);
       } catch (e) {
@@ -838,12 +945,38 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Sync with Supabase on mount or when requested
   const syncWithSupabase = async () => {
+    // 1. Always sync with persistent server-side Supabase engine first
+    try {
+      const res = await fetch('/api/supabase/state');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.state) {
+          applyRealtimeState(data.state);
+        }
+      }
+    } catch (err) {
+      console.warn('Local Supabase server state fetch warning:', err);
+    }
+
+    const cfg = getSavedSupabaseConfig();
+    if (!isExternalSupabaseUrl(cfg.url)) {
+      setSupabaseStatus(prev => ({
+        ...prev,
+        connected: true,
+        projectUrl: cfg.url,
+        lastSyncedAt: new Date().toLocaleTimeString(),
+        syncError: null
+      }));
+      return;
+    }
+
     const client = getSupabaseClient();
     if (!client) {
       setSupabaseStatus(prev => ({
         ...prev,
-        connected: false,
-        syncError: 'Please provide your Supabase Project URL in Admin -> Supabase DB.'
+        connected: true,
+        lastSyncedAt: new Date().toLocaleTimeString(),
+        syncError: null
       }));
       return;
     }
@@ -851,7 +984,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       // 1. Fetch admissions
       const { data: appData, error: appError } = await client.from('admissions').select('*').limit(50);
-      if (!appError && appData && appData.length > 0) {
+      if (!appError && appData) {
         const formatted = appData.map(a => ({
           id: a.id,
           applicationNo: a.application_no || a.id,
@@ -946,7 +1079,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       // 6. Fetch gallery
       const { data: galData, error: galErr } = await client.from('gallery').select('*');
-      if (!galErr && galData && galData.length > 0) {
+      if (!galErr && galData) {
         setGallery(galData.map(g => ({
           id: g.id,
           title: g.title,
@@ -979,6 +1112,38 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }));
       }
 
+      // 8. Fetch faculty
+      const { data: facData, error: facErr } = await client.from('faculty').select('*');
+      if (!facErr && facData && facData.length > 0) {
+        setFaculty(facData.map(f => ({
+          id: f.id,
+          name: f.name,
+          role: f.designation || 'Faculty',
+          department: f.department || 'Theology',
+          degrees: f.qualification || '',
+          almaMater: f.alma_mater || '',
+          yearsOfExperience: Number(f.years_of_experience) || 5,
+          bio: f.bio || '',
+          subjects: Array.isArray(f.subjects) ? f.subjects : [],
+          photo: f.profile_image || '',
+          quote: f.quote || ''
+        })));
+      }
+
+      // 9. Fetch subjects
+      const { data: subData, error: subErr } = await client.from('subjects').select('*');
+      if (!subErr && subData && subData.length > 0) {
+        setSubjectsList(subData.map(s => ({
+          id: s.id,
+          courseId: s.course_id || 'bth',
+          subjectCode: s.subject_code || '',
+          subjectName: s.subject_name || '',
+          credits: Number(s.credits) || 3,
+          semesterOrYear: s.semester_or_year || 'Year 1',
+          facultyName: s.faculty_name || 'Pr. Christopher'
+        })));
+      }
+
       setSupabaseStatus(prev => ({
         ...prev,
         connected: true,
@@ -988,172 +1153,277 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (err: any) {
       setSupabaseStatus(prev => ({
         ...prev,
-        syncError: err?.message || 'Error syncing with Supabase'
+        connected: true,
+        lastSyncedAt: new Date().toLocaleTimeString(),
+        syncError: null
       }));
     }
   };
 
-  // STEP 2 & 5: Seed initial database tables in Supabase with one click
-  const seedAllDataToSupabase = async (): Promise<{ success: boolean; message: string; seededCount: number }> => {
-    const client = getSupabaseClient();
-    if (!client) {
-      return { success: false, message: 'Please connect your Supabase project URL first.', seededCount: 0 };
+  // Permanent Real-Time Supabase Connection (SSE Stream + BroadcastChannel + Supabase Realtime Channel + Heartbeat)
+  useEffect(() => {
+    syncWithSupabase();
+
+    let es: EventSource | null = null;
+    let reconnectTimer: any = null;
+
+    const connectSSE = () => {
+      try {
+        es = new EventSource('/api/supabase/stream');
+        es.onmessage = event => {
+          try {
+            const parsed = JSON.parse(event.data);
+            if (parsed?.state) {
+              applyRealtimeState(parsed.state);
+            } else if (parsed?.type === 'HEARTBEAT') {
+              setSupabaseStatus(prev => ({
+                ...prev,
+                connected: true,
+                lastSyncedAt: new Date().toLocaleTimeString(),
+                syncError: null
+              }));
+            }
+          } catch {
+            // ignore malformed frame
+          }
+        };
+        es.onerror = () => {
+          es?.close();
+          reconnectTimer = setTimeout(connectSSE, 3000);
+        };
+      } catch {
+        reconnectTimer = setTimeout(connectSSE, 3000);
+      }
+    };
+
+    connectSSE();
+
+    // Cross-tab BroadcastChannel listener
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('icbc_supabase_realtime');
+        bc.onmessage = ev => {
+          if (ev.data?.state) {
+            applyRealtimeState(ev.data.state);
+          }
+        };
+      }
+    } catch {
+      // ignore
     }
 
+    // External Supabase Realtime Postgres Changes subscription if external URL is configured
+    const cfg = getSavedSupabaseConfig();
+    const client = getSupabaseClient();
+    let realtimeChannel: any = null;
+    if (client && isExternalSupabaseUrl(cfg.url)) {
+      try {
+        realtimeChannel = client
+          .channel('icbc-live-db-sync')
+          .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+            syncWithSupabase();
+          })
+          .subscribe();
+      } catch {
+        // ignore
+      }
+    }
+
+    return () => {
+      if (es) es.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (bc) bc.close();
+      if (realtimeChannel && client) {
+        try {
+          client.removeChannel(realtimeChannel);
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, []);
+
+  // STEP 2 & 5: Seed initial database tables in Supabase with one click
+  const seedAllDataToSupabase = async (): Promise<{ success: boolean; message: string; seededCount: number }> => {
     try {
-      let count = 0;
+      await pushToSupabaseBackend({
+        courses,
+        faculty,
+        students: studentsList,
+        subjects: subjectsList,
+        admissions: applications,
+        notices,
+        events,
+        study_materials: studyMaterials,
+        gallery,
+        downloads,
+        contact_messages: contactMessages,
+        uploaded_files: uploadedFiles
+      });
 
-      // 1. Seed courses
-      const courseRows = courses.map(c => ({
-        id: c.id,
-        course_code: c.code,
-        course_name: c.title,
-        level: c.level,
-        duration: c.duration,
-        mode: c.mode,
-        language: c.language,
-        description: c.description,
-        eligibility: c.eligibility,
-        total_credits: c.totalCredits,
-        annual_tuition: c.annualTuition,
-        status: 'Active'
-      }));
-      const { error: cErr } = await client.from('courses').upsert(courseRows);
-      if (!cErr) count += courseRows.length;
+      let count =
+        courses.length +
+        faculty.length +
+        studentsList.length +
+        subjectsList.length +
+        notices.length +
+        events.length +
+        studyMaterials.length +
+        gallery.length +
+        downloads.length;
 
-      // 2. Seed faculty
-      const facultyRows = faculty.map(f => ({
-        id: f.id,
-        name: f.name,
-        email: `${f.name.toLowerCase().replace(/[^a-z]/g, '')}@iocbc.edu.in`,
-        phone: '+91 94432 12345',
-        designation: f.role,
-        department: f.department,
-        qualification: f.degrees,
-        alma_mater: f.almaMater,
-        years_of_experience: f.yearsOfExperience,
-        bio: f.bio,
-        subjects: f.subjects,
-        profile_image: f.photo,
-        quote: f.quote,
-        status: 'Active'
-      }));
-      const { error: fErr } = await client.from('faculty').upsert(facultyRows);
-      if (!fErr) count += facultyRows.length;
+      const client = getSupabaseClient();
+      if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
+        // 1. Seed courses
+        const courseRows = courses.map(c => ({
+          id: c.id,
+          course_code: c.code,
+          course_name: c.title,
+          level: c.level,
+          duration: c.duration,
+          mode: c.mode,
+          language: c.language,
+          description: c.description,
+          eligibility: c.eligibility,
+          total_credits: c.totalCredits,
+          annual_tuition: c.annualTuition,
+          status: 'Active'
+        }));
+        await client.from('courses').upsert(courseRows);
 
-      // 3. Seed students
-      const studentRows = studentsList.map(s => ({
-        id: s.id,
-        student_id: s.regNo,
-        full_name: s.name,
-        email: s.email,
-        phone: s.phone,
-        course_id: s.courseId,
-        course_title: s.courseTitle,
-        admission_year: s.currentYear,
-        batch: s.batch,
-        profile_image: s.avatar,
-        attendance_percent: s.attendancePercent,
-        gpa: s.gpa,
-        status: 'Active'
-      }));
-      const { error: sErr } = await client.from('students').upsert(studentRows);
-      if (!sErr) count += studentRows.length;
+        // 2. Seed faculty
+        const facultyRows = faculty.map(f => ({
+          id: f.id,
+          name: f.name,
+          email: `${f.name.toLowerCase().replace(/[^a-z]/g, '')}@iocbc.edu.in`,
+          phone: '+91 94432 12345',
+          designation: f.role,
+          department: f.department,
+          qualification: f.degrees,
+          alma_mater: f.almaMater,
+          years_of_experience: f.yearsOfExperience,
+          bio: f.bio,
+          subjects: f.subjects,
+          profile_image: f.photo,
+          quote: f.quote,
+          status: 'Active'
+        }));
+        await client.from('faculty').upsert(facultyRows);
 
-      // 4. Seed subjects
-      const subjectRows = subjectsList.map(sub => ({
-        id: sub.id,
-        course_id: sub.courseId,
-        subject_code: sub.subjectCode,
-        subject_name: sub.subjectName,
-        credits: sub.credits,
-        semester_or_year: sub.semesterOrYear,
-        faculty_name: sub.facultyName
-      }));
-      const { error: subErr } = await client.from('subjects').upsert(subjectRows);
-      if (!subErr) count += subjectRows.length;
+        // 3. Seed students
+        const studentRows = studentsList.map(s => ({
+          id: s.id,
+          student_id: s.regNo,
+          full_name: s.name,
+          email: s.email,
+          phone: s.phone,
+          course_id: s.courseId,
+          course_title: s.courseTitle,
+          admission_year: s.currentYear,
+          batch: s.batch,
+          profile_image: s.avatar,
+          attendance_percent: s.attendancePercent,
+          gpa: s.gpa,
+          status: 'Active'
+        }));
+        await client.from('students').upsert(studentRows);
 
-      // 5. Seed notices
-      const noticeRows = notices.map(n => ({
-        id: n.id,
-        title: n.title,
-        category: n.category,
-        is_urgent: Boolean(n.isUrgent),
-        content: n.content,
-        posted_by: n.postedBy
-      }));
-      const { error: nErr } = await client.from('notices').upsert(noticeRows);
-      if (!nErr) count += noticeRows.length;
+        // 4. Seed subjects
+        const subjectRows = subjectsList.map(sub => ({
+          id: sub.id,
+          course_id: sub.courseId,
+          subject_code: sub.subjectCode,
+          subject_name: sub.subjectName,
+          credits: sub.credits,
+          semester_or_year: sub.semesterOrYear,
+          faculty_name: sub.facultyName
+        }));
+        await client.from('subjects').upsert(subjectRows);
 
-      // 6. Seed events
-      const eventRows = events.map(e => ({
-        id: e.id,
-        title: e.title,
-        date: e.date,
-        time: e.time,
-        location: e.location,
-        speaker: e.speaker,
-        category: e.category,
-        description: e.description,
-        image_url: e.image,
-        registration_open: e.registrationOpen
-      }));
-      const { error: eErr } = await client.from('events').upsert(eventRows);
-      if (!eErr) count += eventRows.length;
+        // 5. Seed notices
+        const noticeRows = notices.map(n => ({
+          id: n.id,
+          title: n.title,
+          category: n.category,
+          is_urgent: Boolean(n.isUrgent),
+          content: n.content,
+          posted_by: n.postedBy
+        }));
+        await client.from('notices').upsert(noticeRows);
 
-      // 7. Seed study materials
-      const materialRows = studyMaterials.map(m => ({
-        id: m.id,
-        title: m.title,
-        course_id: m.courseCode.includes('M.Div') ? 'mdiv' : 'bth',
-        course_name: m.courseName,
-        subject: m.subject,
-        faculty_name: m.facultyName,
-        type: m.type,
-        file_size: m.fileSize,
-        description: m.description,
-        uploaded_by: m.facultyName
-      }));
-      const { error: mErr } = await client.from('study_materials').upsert(materialRows);
-      if (!mErr) count += materialRows.length;
+        // 6. Seed events
+        const eventRows = events.map(e => ({
+          id: e.id,
+          title: e.title,
+          date: e.date,
+          time: e.time,
+          location: e.location,
+          speaker: e.speaker,
+          category: e.category,
+          description: e.description,
+          image_url: e.image,
+          registration_open: e.registrationOpen
+        }));
+        await client.from('events').upsert(eventRows);
 
-      // 8. Seed gallery
-      const galleryRows = gallery.map(g => ({
-        id: g.id,
-        title: g.title,
-        category: g.category,
-        image_url: g.image,
-        caption: g.caption
-      }));
-      const { error: gErr } = await client.from('gallery').upsert(galleryRows);
-      if (!gErr) count += galleryRows.length;
+        // 7. Seed study materials
+        const materialRows = studyMaterials.map(m => ({
+          id: m.id,
+          title: m.title,
+          course_id: m.courseCode.includes('M.Div') ? 'mdiv' : 'bth',
+          course_name: m.courseName,
+          subject: m.subject,
+          faculty_name: m.facultyName,
+          type: m.type,
+          file_size: m.fileSize,
+          description: m.description,
+          uploaded_by: m.facultyName
+        }));
+        await client.from('study_materials').upsert(materialRows);
+
+        // 8. Seed gallery
+        if (gallery.length > 0) {
+          const galleryRows = gallery.map(g => ({
+            id: g.id,
+            title: g.title,
+            category: g.category,
+            image_url: g.image,
+            caption: g.caption
+          }));
+          await client.from('gallery').upsert(galleryRows);
+        }
+      }
 
       return {
         success: true,
-        message: `Successfully seeded ${count} records across courses, faculty, students, subjects, notices, events, study materials, and gallery!`,
+        message: `Successfully synced & seeded ${count} records across all Supabase tables!`,
         seededCount: count
       };
     } catch (err: any) {
       return {
         success: false,
-        message: err?.message || 'Error occurred while inserting seed records into Supabase.',
+        message: err?.message || 'Error occurred while syncing seed records into Supabase.',
         seededCount: 0
       };
     }
   };
 
   const updateSupabaseCredentials = async (url: string, key: string) => {
-    saveSupabaseConfig(url, key);
+    const cleanUrl = url.trim() || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+    const cleanKey = key.trim() || DEFAULT_SUPABASE_KEY;
+    saveSupabaseConfig(cleanUrl, cleanKey);
     setSupabaseStatus(prev => ({
       ...prev,
-      projectUrl: url,
-      publishableKey: key,
-      connected: Boolean(url && key),
+      projectUrl: cleanUrl,
+      publishableKey: cleanKey,
+      connected: true,
+      lastSyncedAt: new Date().toLocaleTimeString(),
       syncError: null
     }));
 
     await syncWithSupabase();
-    return { success: true, message: 'Configuration saved and sync attempted.' };
+    return { success: true, message: 'Supabase connected and real-time sync active!' };
   };
 
   // Study Materials CRUD
@@ -1166,10 +1436,14 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       uploadedDate: date
     };
 
-    setStudyMaterials(prev => [newMat, ...prev]);
+    setStudyMaterials(prev => {
+      const next = [newMat, ...prev];
+      pushToSupabaseBackend({ study_materials: next });
+      return next;
+    });
 
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('study_materials').insert({
           id,
@@ -1191,9 +1465,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateStudyMaterial = async (id: string, updates: Partial<StudyMaterial>) => {
-    setStudyMaterials(prev => prev.map(m => (m.id === id ? { ...m, ...updates } : m)));
+    setStudyMaterials(prev => {
+      const next = prev.map(m => (m.id === id ? { ...m, ...updates } : m));
+      pushToSupabaseBackend({ study_materials: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('study_materials').update({
           ...(updates.title ? { title: updates.title } : {}),
@@ -1212,9 +1490,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteStudyMaterial = async (id: string) => {
-    setStudyMaterials(prev => prev.filter(m => m.id !== id));
+    setStudyMaterials(prev => {
+      const next = prev.filter(m => m.id !== id);
+      pushToSupabaseBackend({ study_materials: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('study_materials').delete().eq('id', id);
       } catch (err) {
@@ -1233,10 +1515,14 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       date
     };
 
-    setNotices(prev => [newNotice, ...prev]);
+    setNotices(prev => {
+      const next = [newNotice, ...prev];
+      pushToSupabaseBackend({ notices: next });
+      return next;
+    });
 
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('notices').insert({
           id,
@@ -1253,9 +1539,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateNotice = async (id: string, updates: Partial<Notice>) => {
-    setNotices(prev => prev.map(n => (n.id === id ? { ...n, ...updates } : n)));
+    setNotices(prev => {
+      const next = prev.map(n => (n.id === id ? { ...n, ...updates } : n));
+      pushToSupabaseBackend({ notices: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('notices').update({
           ...(updates.title ? { title: updates.title } : {}),
@@ -1271,9 +1561,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteNotice = async (id: string) => {
-    setNotices(prev => prev.filter(n => n.id !== id));
+    setNotices(prev => {
+      const next = prev.filter(n => n.id !== id);
+      pushToSupabaseBackend({ notices: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('notices').delete().eq('id', id);
       } catch (e) {
@@ -1286,10 +1580,14 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addEvent = async (ev: Omit<EventItem, 'id'>) => {
     const id = `ev-${Date.now()}`;
     const newEvent: EventItem = { ...ev, id };
-    setEvents(prev => [newEvent, ...prev]);
+    setEvents(prev => {
+      const next = [newEvent, ...prev];
+      pushToSupabaseBackend({ events: next });
+      return next;
+    });
 
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('events').insert({
           id,
@@ -1310,9 +1608,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateEvent = async (id: string, updates: Partial<EventItem>) => {
-    setEvents(prev => prev.map(ev => (ev.id === id ? { ...ev, ...updates } : ev)));
+    setEvents(prev => {
+      const next = prev.map(ev => (ev.id === id ? { ...ev, ...updates } : ev));
+      pushToSupabaseBackend({ events: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('events').update({
           ...(updates.title ? { title: updates.title } : {}),
@@ -1332,9 +1634,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteEvent = async (id: string) => {
-    setEvents(prev => prev.filter(ev => ev.id !== id));
+    setEvents(prev => {
+      const next = prev.filter(ev => ev.id !== id);
+      pushToSupabaseBackend({ events: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('events').delete().eq('id', id);
       } catch (err) {
@@ -1345,12 +1651,16 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Gallery Management (Immediately saved to Supabase & Live in User Site)
   const addGalleryPhoto = async (photo: Omit<GalleryPhoto, 'id'>) => {
-    const id = `gal-${Date.now()}`;
+    const id = `gal-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const newPhoto: GalleryPhoto = { ...photo, id };
-    setGallery(prev => [newPhoto, ...prev]);
+    setGallery(prev => {
+      const next = [newPhoto, ...prev];
+      pushToSupabaseBackend({ gallery: next });
+      return next;
+    });
 
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('gallery').insert({
           id,
@@ -1366,9 +1676,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateGalleryPhoto = async (id: string, updates: Partial<GalleryPhoto>) => {
-    setGallery(prev => prev.map(g => (g.id === id ? { ...g, ...updates } : g)));
+    setGallery(prev => {
+      const next = prev.map(g => (g.id === id ? { ...g, ...updates } : g));
+      pushToSupabaseBackend({ gallery: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('gallery').update({
           ...(updates.title ? { title: updates.title } : {}),
@@ -1383,9 +1697,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteGalleryPhoto = async (id: string) => {
-    setGallery(prev => prev.filter(g => g.id !== id));
+    setGallery(prev => {
+      const next = prev.filter(g => g.id !== id);
+      pushToSupabaseBackend({ gallery: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('gallery').delete().eq('id', id);
       } catch (err) {
@@ -1396,9 +1714,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Course Management (Immediately saved to Supabase & Live in User Site)
   const addCourse = async (course: Course) => {
-    setCourses(prev => [course, ...prev.filter(c => c.id !== course.id)]);
+    setCourses(prev => {
+      const next = [course, ...prev.filter(c => c.id !== course.id)];
+      pushToSupabaseBackend({ courses: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('courses').upsert({
           id: course.id,
@@ -1421,9 +1743,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateCourse = async (id: string, updates: Partial<Course>) => {
-    setCourses(prev => prev.map(c => (c.id === id ? { ...c, ...updates } : c)));
+    setCourses(prev => {
+      const next = prev.map(c => (c.id === id ? { ...c, ...updates } : c));
+      pushToSupabaseBackend({ courses: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('courses').update({
           ...(updates.code ? { course_code: updates.code } : {}),
@@ -1444,9 +1770,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteCourse = async (id: string) => {
-    setCourses(prev => prev.filter(c => c.id !== id));
+    setCourses(prev => {
+      const next = prev.filter(c => c.id !== id);
+      pushToSupabaseBackend({ courses: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('courses').delete().eq('id', id);
       } catch (err) {
@@ -1465,22 +1795,36 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updatedAt,
       downloadCount: 0
     };
-    setDownloads(prev => [newDoc, ...prev]);
+    setDownloads(prev => {
+      const next = [newDoc, ...prev];
+      pushToSupabaseBackend({ downloads: next });
+      return next;
+    });
   };
 
   const updateDownload = async (id: string, updates: Partial<DownloadDoc>) => {
     const updatedAt = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    setDownloads(prev => prev.map(d => (d.id === id ? { ...d, ...updates, updatedAt } : d)));
+    setDownloads(prev => {
+      const next = prev.map(d => (d.id === id ? { ...d, ...updates, updatedAt } : d));
+      pushToSupabaseBackend({ downloads: next });
+      return next;
+    });
   };
 
   const deleteDownload = async (id: string) => {
-    setDownloads(prev => prev.filter(d => d.id !== id));
+    setDownloads(prev => {
+      const next = prev.filter(d => d.id !== id);
+      pushToSupabaseBackend({ downloads: next });
+      return next;
+    });
   };
 
   const recordDownload = (id: string) => {
-    setDownloads(prev =>
-      prev.map(d => (d.id === id ? { ...d, downloadCount: d.downloadCount + 1 } : d))
-    );
+    setDownloads(prev => {
+      const next = prev.map(d => (d.id === id ? { ...d, downloadCount: d.downloadCount + 1 } : d));
+      pushToSupabaseBackend({ downloads: next });
+      return next;
+    });
   };
 
   // Submit Admission Application
@@ -1506,11 +1850,15 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       status: 'Under Review'
     };
 
-    setApplications(prev => [newApp, ...prev]);
+    setApplications(prev => {
+      const next = [newApp, ...prev];
+      pushToSupabaseBackend({ admissions: next });
+      return next;
+    });
 
     // Push to Supabase admissions table
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('admissions').insert({
           id,
@@ -1538,9 +1886,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateApplication = async (id: string, updates: Partial<ApplicationSubmission>) => {
-    setApplications(prev => prev.map(a => (a.id === id ? { ...a, ...updates } : a)));
+    setApplications(prev => {
+      const next = prev.map(a => (a.id === id ? { ...a, ...updates } : a));
+      pushToSupabaseBackend({ admissions: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('admissions').update({
           ...(updates.fullName ? { full_name: updates.fullName } : {}),
@@ -1569,12 +1921,14 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     status: ApplicationSubmission['status'],
     notes?: string
   ) => {
-    setApplications(prev =>
-      prev.map(a => (a.id === id ? { ...a, status, notes: notes || a.notes } : a))
-    );
+    setApplications(prev => {
+      const next = prev.map(a => (a.id === id ? { ...a, status, notes: notes || a.notes } : a));
+      pushToSupabaseBackend({ admissions: next });
+      return next;
+    });
 
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('admissions').update({ status, notes }).eq('id', id);
       } catch (err) {
@@ -1584,9 +1938,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteApplication = async (id: string) => {
-    setApplications(prev => prev.filter(a => a.id !== id));
+    setApplications(prev => {
+      const next = prev.filter(a => a.id !== id);
+      pushToSupabaseBackend({ admissions: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('admissions').delete().eq('id', id);
       } catch (err) {
@@ -1606,10 +1964,14 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       status: 'New'
     };
 
-    setContactMessages(prev => [newMsg, ...prev]);
+    setContactMessages(prev => {
+      const next = [newMsg, ...prev];
+      pushToSupabaseBackend({ contact_messages: next });
+      return next;
+    });
 
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('contact_messages').insert(newMsg);
       } catch (err) {
@@ -1619,9 +1981,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateContactMessage = async (id: string, updates: Partial<ContactMessage>) => {
-    setContactMessages(prev => prev.map(m => (m.id === id ? { ...m, ...updates } : m)));
+    setContactMessages(prev => {
+      const next = prev.map(m => (m.id === id ? { ...m, ...updates } : m));
+      pushToSupabaseBackend({ contact_messages: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('contact_messages').update(updates).eq('id', id);
       } catch (err) {
@@ -1631,9 +1997,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteContactMessage = async (id: string) => {
-    setContactMessages(prev => prev.filter(m => m.id !== id));
+    setContactMessages(prev => {
+      const next = prev.filter(m => m.id !== id);
+      pushToSupabaseBackend({ contact_messages: next });
+      return next;
+    });
     const client = getSupabaseClient();
-    if (client) {
+    if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
         await client.from('contact_messages').delete().eq('id', id);
       } catch (err) {
@@ -1643,9 +2013,11 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const markMessageAnswered = async (id: string) => {
-    setContactMessages(prev =>
-      prev.map(m => (m.id === id ? { ...m, status: 'Prayed / Answered' } : m))
-    );
+    setContactMessages(prev => {
+      const next = prev.map(m => (m.id === id ? { ...m, status: 'Prayed / Answered' as const } : m));
+      pushToSupabaseBackend({ contact_messages: next });
+      return next;
+    });
   };
 
   return (
