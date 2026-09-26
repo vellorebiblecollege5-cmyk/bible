@@ -20,15 +20,25 @@ export function normalizeSupabaseUrl(raw: string): string {
   const trimmed = (raw || '').trim();
   if (!trimmed) return DEFAULT_SUPABASE_URL;
 
+  // If someone accidentally pasted an API key (sb_publishable_..., sb_secret_..., eyJ...) into the URL field, use DEFAULT_SUPABASE_URL
+  if (trimmed.startsWith('sb_') || trimmed.startsWith('eyJ')) {
+    return DEFAULT_SUPABASE_URL;
+  }
+
   // If stored URL was localhost or a cloud run preview URL, use the real Supabase URL
   if (trimmed.includes('localhost') || trimmed.includes('.run.app')) {
     return DEFAULT_SUPABASE_URL;
   }
 
-  // Extract project ref if user pasted postgresql://...@db.<ref>.supabase.co:5432/postgres or db.<ref>.supabase.co
+  // Extract project ref if user pasted postgresql://...@db.<ref>.supabase.co:5432/postgres or db.<ref>.supabase.co or https://<ref>.supabase.co
   const dbMatch = trimmed.match(/(?:db\.)?([a-z0-9]{15,25})\.supabase\.co/i);
   if (dbMatch && dbMatch[1]) {
     return `https://${dbMatch[1].toLowerCase()}.supabase.co`;
+  }
+
+  // If it doesn't contain .supabase.co at all, fall back to DEFAULT_SUPABASE_URL
+  if (!trimmed.includes('.supabase.co')) {
+    return DEFAULT_SUPABASE_URL;
   }
 
   if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
@@ -45,9 +55,15 @@ export function getSavedSupabaseConfig(): { url: string; key: string } {
   const rawStoredKey = typeof window !== 'undefined' ? localStorage.getItem(SUPABASE_STORAGE_KEY_KEY) : null;
 
   const storedUrl = rawStoredUrl || envUrl || DEFAULT_SUPABASE_URL;
-  let storedKey = rawStoredKey || envKey || DEFAULT_SUPABASE_KEY;
+  let storedKey = (rawStoredKey || envKey || DEFAULT_SUPABASE_KEY).trim();
 
-  if (LEGACY_KEYS.includes(storedKey.trim())) {
+  // Auto-heal if legacy key, secret key, or a URL was accidentally pasted into the key field
+  if (
+    LEGACY_KEYS.includes(storedKey) ||
+    storedKey.startsWith('sb_secret_') ||
+    storedKey.includes('supabase.co') ||
+    storedKey.startsWith('http')
+  ) {
     storedKey = DEFAULT_SUPABASE_KEY;
     if (typeof window !== 'undefined') {
       localStorage.setItem(SUPABASE_STORAGE_KEY_KEY, DEFAULT_SUPABASE_KEY);
@@ -61,7 +77,7 @@ export function getSavedSupabaseConfig(): { url: string; key: string } {
 
   return {
     url: finalUrl,
-    key: storedKey.trim()
+    key: storedKey
   };
 }
 

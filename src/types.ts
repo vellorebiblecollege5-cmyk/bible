@@ -107,6 +107,7 @@ export interface GalleryPhoto {
   category: 'Campus' | 'Chapel' | 'Graduation' | 'Outreach' | 'Student Life' | 'Classroom';
   image: string;
   caption: string;
+  _updatedAt?: number;
 }
 
 export interface DownloadDoc {

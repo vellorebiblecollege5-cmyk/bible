@@ -640,6 +640,59 @@ export const HomeView: React.FC = () => {
         </div>
       </section>
 
+      {/* 4B. LIVE CAMPUS PHOTO GALLERY SECTION (Shows uploaded photos directly on Home Page) */}
+      {gallery.length > 0 && (
+        <section className="py-14 bg-[#faf7f0] border-t border-stone-200/80">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+              <div className="space-y-1.5">
+                <span className="text-xs uppercase tracking-widest text-amber-700 font-bold">
+                  Campus Moments & Memories
+                </span>
+                <h2 className="font-cinzel text-2xl sm:text-3xl font-extrabold text-[#0f2444]">
+                  Campus Photo Gallery
+                </h2>
+              </div>
+              <button
+                onClick={() => setActivePage('gallery')}
+                className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-[#0f2444] hover:bg-blue-900 text-amber-300 font-bold text-xs uppercase tracking-wider shadow-sm transition-all cursor-pointer self-start sm:self-auto"
+              >
+                <span>View Full Gallery ({gallery.length})</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {gallery.slice(0, 8).map(item => (
+                <div
+                  key={item.id}
+                  onClick={() => setActivePage('gallery')}
+                  className="group relative rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer bg-slate-900 aspect-4/3 border border-stone-200"
+                >
+                  <img
+                    src={item.image}
+                    alt={item.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
+                  <span className="absolute top-3 left-3 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-black/60 text-amber-300 backdrop-blur-sm">
+                    {item.category}
+                  </span>
+                  <div className="absolute bottom-3 left-3 right-3 text-white space-y-0.5">
+                    <h4 className="font-cinzel text-sm font-bold leading-snug group-hover:text-amber-300 transition-colors">
+                      {item.title}
+                    </h4>
+                    <p className="text-[11px] text-stone-300 line-clamp-1">
+                      {item.caption}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 5. START YOUR JOURNEY TODAY - BOTTOM BANNER MATCHING IMAGE */}
       <section className="relative overflow-hidden bg-[#0a1426] text-white py-16 border-t-2 border-amber-500/30">
         {/* Subtle sunset warmth backdrop with cross silhouette */}

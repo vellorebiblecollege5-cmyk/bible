@@ -386,8 +386,42 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     uploadedFiles
   };
 
-  // Helper to push updates to persistent Supabase server store & broadcast to all open website tabs
+  // Helper to push updates to persistent Supabase cloud store (college_sync_state) & local server & broadcast to all open tabs
   const pushToSupabaseBackend = async (payload: Record<string, any[]>) => {
+    const live = liveStateRef.current;
+    const nextState = {
+      courses: Array.isArray(payload.courses) ? payload.courses : live.courses,
+      faculty: Array.isArray(payload.faculty) ? payload.faculty : live.faculty,
+      students: Array.isArray(payload.students) ? payload.students : live.studentsList,
+      subjects: Array.isArray(payload.subjects) ? payload.subjects : live.subjectsList,
+      admissions: Array.isArray(payload.admissions) ? payload.admissions : live.applications,
+      notices: Array.isArray(payload.notices) ? payload.notices : live.notices,
+      events: Array.isArray(payload.events) ? payload.events : live.events,
+      study_materials: Array.isArray(payload.study_materials) ? payload.study_materials : live.studyMaterials,
+      gallery: Array.isArray(payload.gallery) ? payload.gallery : live.gallery,
+      downloads: Array.isArray(payload.downloads) ? payload.downloads : live.downloads,
+      contact_messages: Array.isArray(payload.contact_messages) ? payload.contact_messages : live.contactMessages,
+      uploaded_files: Array.isArray(payload.uploaded_files) ? payload.uploaded_files : live.uploadedFiles,
+      deleted_ids: Array.from(deletedIdsRef.current),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Keep liveStateRef immediately up to date
+    liveStateRef.current = {
+      courses: nextState.courses,
+      faculty: nextState.faculty,
+      studentsList: nextState.students,
+      subjectsList: nextState.subjects,
+      applications: nextState.admissions,
+      notices: nextState.notices,
+      events: nextState.events,
+      studyMaterials: nextState.study_materials,
+      gallery: nextState.gallery,
+      downloads: nextState.downloads,
+      contactMessages: nextState.contact_messages,
+      uploadedFiles: nextState.uploaded_files
+    };
+
     if (Array.isArray(payload.courses)) safeSetLocalStorage(STORAGE_KEYS.COURSES, JSON.stringify(payload.courses));
     if (Array.isArray(payload.faculty)) safeSetLocalStorage(STORAGE_KEYS.FACULTY, JSON.stringify(payload.faculty));
     if (Array.isArray(payload.students)) safeSetLocalStorage(STORAGE_KEYS.STUDENTS, JSON.stringify(payload.students));
@@ -408,7 +442,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
           type: 'SUPABASE_REALTIME_SYNC',
           senderId: clientSessionId,
           state: payload,
-          updatedAt: new Date().toISOString()
+          updatedAt: nextState.updatedAt
         });
         bc.close();
       }
@@ -416,6 +450,29 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // ignore BroadcastChannel errors
     }
 
+    // 1. Save directly to Supabase Cloud (public.college_sync_state) so Vercel & all devices see updates immediately
+    const client = getSupabaseClient();
+    const cfg = getSavedSupabaseConfig();
+    if (client && isExternalSupabaseUrl(cfg.url)) {
+      try {
+        await client.from('college_sync_state').upsert({
+          id: 'icbc_main_state',
+          payload: nextState,
+          updated_at: nextState.updatedAt
+        });
+        setSupabaseStatus(prev => ({
+          ...prev,
+          connected: true,
+          projectUrl: cfg.url,
+          lastSyncedAt: new Date().toLocaleTimeString(),
+          syncError: null
+        }));
+      } catch (cloudErr) {
+        console.warn('Supabase cloud college_sync_state upsert warning:', cloudErr);
+      }
+    }
+
+    // 2. Also sync with local Express dev server if available
     try {
       await fetch('/api/supabase/sync', {
         method: 'POST',
@@ -428,8 +485,8 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         lastSyncedAt: new Date().toLocaleTimeString(),
         syncError: null
       }));
-    } catch (err) {
-      console.warn('Background Supabase sync error:', err);
+    } catch {
+      // On Vercel static hosting, /api/supabase/sync is not needed because college_sync_state handles cloud persistence
     }
   };
 
@@ -1097,92 +1154,215 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return { merged: mergedRemote, extraLocal: [], localHasExtra: false };
   };
 
-  const mergeAndSyncInitialState = (serverState: any) => {
+  const mergeAndSyncInitialState = (serverState: any, shouldPushExtras = true) => {
     if (!serverState || typeof serverState !== 'object') return;
+
+    if (Array.isArray(serverState.deleted_ids)) {
+      serverState.deleted_ids.forEach((id: string) => {
+        if (id) deletedIdsRef.current.add(id);
+      });
+      safeSetLocalStorage(STORAGE_KEYS.DELETED_IDS, JSON.stringify(Array.from(deletedIdsRef.current)));
+    }
+
     const live = liveStateRef.current;
     const toPush: Record<string, any[]> = {};
 
     const crs = mergeByIdHelper(live.courses, serverState.courses);
     setCourses(crs.merged);
+    live.courses = crs.merged;
     if (crs.localHasExtra) toPush.courses = crs.merged;
 
     const fac = mergeByIdHelper(live.faculty, serverState.faculty);
     setFaculty(fac.merged);
+    live.faculty = fac.merged;
     if (fac.localHasExtra) toPush.faculty = fac.merged;
 
     const std = mergeByIdHelper(live.studentsList, serverState.students);
     setStudentsList(std.merged);
+    live.studentsList = std.merged;
     if (std.localHasExtra) toPush.students = std.merged;
 
     const sub = mergeByIdHelper(live.subjectsList, serverState.subjects);
     setSubjectsList(sub.merged);
+    live.subjectsList = sub.merged;
     if (sub.localHasExtra) toPush.subjects = sub.merged;
 
     const adm = mergeByIdHelper(live.applications, serverState.admissions);
     setApplications(adm.merged);
+    live.applications = adm.merged;
     if (adm.localHasExtra) toPush.admissions = adm.merged;
 
     const not = mergeByIdHelper(live.notices, serverState.notices);
     setNotices(not.merged);
+    live.notices = not.merged;
     if (not.localHasExtra) toPush.notices = not.merged;
 
     const ev = mergeByIdHelper(live.events, serverState.events);
     setEvents(ev.merged);
+    live.events = ev.merged;
     if (ev.localHasExtra) toPush.events = ev.merged;
 
     const mat = mergeByIdHelper(live.studyMaterials, serverState.study_materials);
     setStudyMaterials(mat.merged);
+    live.studyMaterials = mat.merged;
     if (mat.localHasExtra) toPush.study_materials = mat.merged;
 
     const gal = mergeByIdHelper(live.gallery, serverState.gallery);
     setGallery(gal.merged);
+    live.gallery = gal.merged;
     if (gal.localHasExtra) toPush.gallery = gal.merged;
 
     const dl = mergeByIdHelper(live.downloads, serverState.downloads);
     setDownloads(dl.merged);
+    live.downloads = dl.merged;
     if (dl.localHasExtra) toPush.downloads = dl.merged;
 
     const msg = mergeByIdHelper(live.contactMessages, serverState.contact_messages);
     setContactMessages(msg.merged);
+    live.contactMessages = msg.merged;
     if (msg.localHasExtra) toPush.contact_messages = msg.merged;
 
-    if (Object.keys(toPush).length > 0) {
+    if (Array.isArray(serverState.uploaded_files)) {
+      const localFiles = live.uploadedFiles || [];
+      const existingUrls = new Set(localFiles.map(f => f.url));
+      const mergedFiles = [...localFiles];
+      for (const rf of serverState.uploaded_files) {
+        if (rf && rf.url && !existingUrls.has(rf.url)) {
+          mergedFiles.push(rf);
+          existingUrls.add(rf.url);
+        }
+      }
+      setUploadedFiles(mergedFiles);
+      live.uploadedFiles = mergedFiles;
+      if (mergedFiles.length > serverState.uploaded_files.length) {
+        toPush.uploaded_files = mergedFiles;
+      }
+    }
+
+    if (shouldPushExtras && Object.keys(toPush).length > 0) {
       pushToSupabaseBackend(toPush);
     }
   };
 
   // Sync with Supabase on mount or when requested
   const syncWithSupabase = async () => {
-    // 1. Always sync with persistent server-side Supabase engine first
+    const cfg = getSavedSupabaseConfig();
+    const client = getSupabaseClient();
+
+    // 1. First sync with real Supabase Cloud (public.college_sync_state + Storage buckets)
+    if (client && isExternalSupabaseUrl(cfg.url)) {
+      try {
+        const { data: syncRow, error: syncErr } = await client
+          .from('college_sync_state')
+          .select('*')
+          .eq('id', 'icbc_main_state')
+          .maybeSingle();
+
+        if (!syncErr && syncRow && syncRow.payload && typeof syncRow.payload === 'object') {
+          mergeAndSyncInitialState(syncRow.payload, true);
+        }
+
+        // Also discover any images uploaded directly to Supabase Storage 'gallery' bucket
+        const { data: storageGalFiles, error: storageGalErr } = await client.storage
+          .from('gallery')
+          .list('', { limit: 100 });
+
+        if (!storageGalErr && Array.isArray(storageGalFiles)) {
+          const validImages = storageGalFiles.filter(
+            f =>
+              f &&
+              f.name &&
+              !f.name.startsWith('.') &&
+              f.name !== 'verification-check.txt' &&
+              /\.(jpe?g|png|webp|gif|svg)$/i.test(f.name)
+          );
+
+          if (validImages.length > 0) {
+            const currentGal = liveStateRef.current.gallery || [];
+            const currentFiles = liveStateRef.current.uploadedFiles || [];
+            let galAdded = false;
+            const nextGal = [...currentGal];
+            const nextFiles = [...currentFiles];
+
+            for (const imgFile of validImages) {
+              const { data: pubUrlData } = client.storage.from('gallery').getPublicUrl(imgFile.name);
+              const publicUrl = pubUrlData?.publicUrl;
+              if (publicUrl) {
+                const alreadyInGallery = nextGal.some(
+                  g => g.image === publicUrl || g.id === `storage-gal-${imgFile.name}`
+                );
+                if (!alreadyInGallery && !deletedIdsRef.current.has(`storage-gal-${imgFile.name}`)) {
+                  const rawTitle = imgFile.name
+                    .replace(/^\d+_/, '')
+                    .replace(/\.[^/.]+$/, '')
+                    .replace(/[-_]/g, ' ');
+                  const cleanTitle =
+                    rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1) || 'Campus Gallery Photo';
+                  nextGal.unshift({
+                    id: `storage-gal-${imgFile.name}`,
+                    title: cleanTitle,
+                    category: 'Campus',
+                    image: publicUrl,
+                    caption: `${cleanTitle} — Image of Christ Bible College, Vellore.`,
+                    _updatedAt: Date.now()
+                  });
+                  galAdded = true;
+                }
+
+                const alreadyInFiles = nextFiles.some(f => f.url === publicUrl);
+                if (!alreadyInFiles) {
+                  nextFiles.unshift({
+                    name: imgFile.name,
+                    bucket: 'gallery',
+                    url: publicUrl,
+                    size: imgFile.metadata?.size
+                      ? `${(Number(imgFile.metadata.size) / (1024 * 1024)).toFixed(2)} MB`
+                      : '0.45 MB',
+                    uploadedAt: imgFile.created_at
+                      ? new Date(imgFile.created_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })
+                      : 'Recent'
+                  });
+                  galAdded = true;
+                }
+              }
+            }
+
+            if (galAdded) {
+              setGallery(nextGal);
+              setUploadedFiles(nextFiles);
+              liveStateRef.current.gallery = nextGal;
+              liveStateRef.current.uploadedFiles = nextFiles;
+              await pushToSupabaseBackend({ gallery: nextGal, uploaded_files: nextFiles });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase college_sync_state fetch warning:', err);
+      }
+    }
+
+    // 2. Also sync with local server-side store if running in preview environment
     try {
       const res = await fetch('/api/supabase/state');
       if (res.ok) {
         const data = await res.json();
         if (data?.state) {
-          mergeAndSyncInitialState(data.state);
+          mergeAndSyncInitialState(data.state, true);
         }
       }
-    } catch (err) {
-      console.warn('Local Supabase server state fetch warning:', err);
+    } catch {
+      // Static hosting (Vercel) does not use /api/supabase/state
     }
 
-    const cfg = getSavedSupabaseConfig();
-    if (!isExternalSupabaseUrl(cfg.url)) {
+    if (!isExternalSupabaseUrl(cfg.url) || !client) {
       setSupabaseStatus(prev => ({
         ...prev,
         connected: true,
         projectUrl: cfg.url,
-        lastSyncedAt: new Date().toLocaleTimeString(),
-        syncError: null
-      }));
-      return;
-    }
-
-    const client = getSupabaseClient();
-    if (!client) {
-      setSupabaseStatus(prev => ({
-        ...prev,
-        connected: true,
         lastSyncedAt: new Date().toLocaleTimeString(),
         syncError: null
       }));
@@ -1600,7 +1780,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // ignore
     }
 
-    // External Supabase Realtime Postgres Changes subscription if external URL is configured
+    // External Supabase Realtime Postgres Changes subscription + periodic cloud sync
     const cfg = getSavedSupabaseConfig();
     const client = getSupabaseClient();
     let realtimeChannel: any = null;
@@ -1608,8 +1788,12 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         realtimeChannel = client
           .channel('icbc-live-db-sync')
-          .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-            syncWithSupabase();
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'college_sync_state' }, (payload: any) => {
+            if (payload?.new?.payload) {
+              mergeAndSyncInitialState(payload.new.payload, false);
+            } else {
+              syncWithSupabase();
+            }
           })
           .subscribe();
       } catch {
@@ -1617,10 +1801,21 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
 
+    const cloudPollInterval = setInterval(() => {
+      syncWithSupabase();
+    }, 10000);
+
+    const handleFocus = () => {
+      syncWithSupabase();
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       if (es) es.close();
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (bc) bc.close();
+      clearInterval(cloudPollInterval);
+      window.removeEventListener('focus', handleFocus);
       if (realtimeChannel && client) {
         try {
           client.removeChannel(realtimeChannel);

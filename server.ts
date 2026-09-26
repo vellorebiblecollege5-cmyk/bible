@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import { createClient } from '@supabase/supabase-js';
 import {
   INITIAL_COURSES,
   INITIAL_FACULTY,
@@ -16,6 +17,41 @@ import {
   INITIAL_APPLICATIONS,
   INITIAL_CONTACT_MESSAGES
 } from './src/data/collegeData';
+
+const DEFAULT_CLOUD_URL = 'https://qbxbfqjzpxiyzobyojex.supabase.co';
+const DEFAULT_CLOUD_KEY = 'sb_publishable_tHwdETTQZKzPhsf1A-_uMQ_Iyx-kXXQ';
+
+function resolveValidSupabaseUrl(raw?: string): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed || trimmed.startsWith('sb_') || trimmed.startsWith('eyJ')) {
+    return DEFAULT_CLOUD_URL;
+  }
+  const match = trimmed.match(/(?:db\.)?([a-z0-9]{15,25})\.supabase\.co/i);
+  if (match && match[1]) {
+    return `https://${match[1].toLowerCase()}.supabase.co`;
+  }
+  return DEFAULT_CLOUD_URL;
+}
+
+function resolveValidSupabaseKey(raw?: string): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed || trimmed.includes('supabase.co') || trimmed.startsWith('http')) {
+    return DEFAULT_CLOUD_KEY;
+  }
+  if (trimmed === 'sb_publishable_mY-zOAZTMoje3pwhNMw4gg_XD_AcXHr') {
+    return DEFAULT_CLOUD_KEY;
+  }
+  return trimmed;
+}
+
+const SUPABASE_CLOUD_URL = resolveValidSupabaseUrl(process.env.VITE_SUPABASE_URL);
+const SUPABASE_CLOUD_KEY = resolveValidSupabaseKey(process.env.VITE_SUPABASE_ANON_KEY);
+let cloudSupabase: any = null;
+try {
+  cloudSupabase = createClient(SUPABASE_CLOUD_URL, SUPABASE_CLOUD_KEY);
+} catch (err) {
+  console.warn('Could not initialize cloudSupabase client:', err);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -97,6 +133,23 @@ function saveStore(store: LiveSupabaseStore) {
     }
     store.updatedAt = new Date().toISOString();
     fs.writeFileSync(DB_FILE_PATH, JSON.stringify(store, null, 2), 'utf-8');
+
+    // Mirror state to Supabase Cloud (public.college_sync_state)
+    if (cloudSupabase) {
+      Promise.resolve(
+        cloudSupabase.from('college_sync_state').upsert({
+          id: 'icbc_main_state',
+          payload: store,
+          updated_at: store.updatedAt
+        })
+      )
+        .then(({ error }) => {
+          if (error) {
+            console.warn('Cloud sync warning:', error.message);
+          }
+        })
+        .catch(() => {});
+    }
   } catch (err) {
     console.error('Failed to persist live-db.json:', err);
   }
