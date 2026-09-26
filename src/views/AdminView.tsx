@@ -578,27 +578,28 @@ export const AdminView: React.FC = () => {
 
   const handleSaveGallery = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!galTitle || !galImage) {
-      showToast('error', 'Please provide photo title and image URL.');
+    if (!galImage) {
+      showToast('error', 'Please upload a picture or provide an image URL.');
       return;
     }
+    const finalTitle = galTitle.trim() || 'Campus Gallery Photo';
     if (editingGalleryId) {
       updateGalleryPhoto(editingGalleryId, {
-        title: galTitle,
+        title: finalTitle,
         category: galCategory,
         image: galImage,
-        caption: galCaption
+        caption: galCaption || `${finalTitle} — Image of Christ Bible College, Vellore.`
       });
       setEditingGalleryId(null);
-      showToast('success', 'Gallery photo updated.');
+      showToast('success', 'Gallery photo updated on website gallery page.');
     } else {
       addGalleryPhoto({
-        title: galTitle,
+        title: finalTitle,
         category: galCategory,
         image: galImage,
-        caption: galCaption
+        caption: galCaption || `${finalTitle} — Image of Christ Bible College, Vellore.`
       });
-      showToast('success', 'Photo added to campus gallery.');
+      showToast('success', 'Picture uploaded and published to the website Gallery page!');
     }
     setGalTitle('');
     setGalImage('');
@@ -2518,147 +2519,269 @@ export const AdminView: React.FC = () => {
 
         {/* TAB 8: GALLERY */}
         {adminTab === 'gallery' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-sm h-fit">
-              <div className="flex items-center justify-between">
-                <h3 className="font-cinzel font-bold text-slate-900 text-lg flex items-center space-x-2">
-                  {editingGalleryId ? <Edit3 className="w-5 h-5 text-amber-600" /> : <Plus className="w-5 h-5 text-blue-900" />}
-                  <span>{editingGalleryId ? 'Edit Gallery Photo' : 'Add Gallery Photo'}</span>
+          <div className="space-y-6">
+            {/* Top Banner: Direct Multi-Picture Uploader & Live Page Link */}
+            <div className="bg-gradient-to-r from-[#0f2444] to-[#1b3563] rounded-3xl p-6 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase tracking-widest text-amber-300 font-bold block">
+                  Website Gallery Manager
+                </span>
+                <h3 className="font-cinzel text-xl font-bold">
+                  Upload Pictures to Website Gallery Page
                 </h3>
-                {editingGalleryId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingGalleryId(null);
-                      setGalTitle('');
-                      setGalImage('');
-                      setGalCaption('');
-                    }}
-                    className="text-xs text-stone-500 hover:text-slate-900 underline cursor-pointer"
-                  >
-                    Cancel Edit
-                  </button>
-                )}
+                <p className="text-xs text-slate-200 max-w-xl">
+                  All default gallery photos have been removed. Any picture you upload here is immediately saved and displayed on the public <strong>Gallery</strong> page of the website.
+                </p>
               </div>
-
-              <form onSubmit={handleSaveGallery} className="space-y-3.5 text-xs">
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Photo Title *</label>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider shadow transition-all inline-flex items-center space-x-2 cursor-pointer">
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Quick Upload Pictures from Device</span>
                   <input
-                    type="text"
-                    required
-                    value={galTitle}
-                    onChange={e => setGalTitle(e.target.value)}
-                    placeholder="e.g. Convocation Ceremony 2025"
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Category</label>
-                  <select
-                    value={galCategory}
-                    onChange={e => setGalCategory(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                  >
-                    <option value="Campus">Campus</option>
-                    <option value="Chapel">Chapel</option>
-                    <option value="Graduation">Graduation</option>
-                    <option value="Library">Library</option>
-                    <option value="Mission">Mission</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Image URL or Upload Photo *</label>
-                  <input
-                    type="text"
-                    required
-                    value={galImage}
-                    onChange={e => setGalImage(e.target.value)}
-                    placeholder="Paste image URL or upload below..."
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900 mb-2"
-                  />
-                  <label className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-slate-800 font-semibold text-[11px] cursor-pointer">
-                    <UploadCloud className="w-3.5 h-3.5" />
-                    <span>Choose Image File from Computer</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async e => {
-                        const f = e.target.files?.[0];
-                        if (f) {
-                          const res = await uploadFileToStorage('gallery', f);
-                          if (res.url) {
-                            setGalImage(res.url);
-                            showToast('success', 'Photo loaded for gallery.');
-                          }
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={async e => {
+                      const files = e.target.files;
+                      if (!files || files.length === 0) return;
+                      setIsUploading(true);
+                      let uploadedCount = 0;
+                      for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const res = await uploadFileToStorage('gallery', file);
+                        if (res.url) {
+                          const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+                          const formattedTitle = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+                          await addGalleryPhoto({
+                            title: formattedTitle || 'Campus Photo',
+                            category: galCategory,
+                            image: res.url,
+                            caption: `${formattedTitle} — Image of Christ Bible College, Vellore.`
+                          });
+                          uploadedCount++;
                         }
-                      }}
-                    />
-                  </label>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">Caption / Description</label>
-                  <textarea
-                    rows={3}
-                    value={galCaption}
-                    onChange={e => setGalCaption(e.target.value)}
-                    placeholder="Describe this campus moment..."
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                      }
+                      setIsUploading(false);
+                      e.target.value = '';
+                      if (uploadedCount > 0) {
+                        showToast('success', `Successfully uploaded ${uploadedCount} picture(s) to the Website Gallery!`);
+                      }
+                    }}
                   />
-                </div>
+                </label>
 
                 <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider transition-colors shadow cursor-pointer"
+                  type="button"
+                  onClick={() => setActivePage('gallery')}
+                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/25 font-bold text-xs uppercase tracking-wider transition-all inline-flex items-center space-x-1.5 cursor-pointer"
                 >
-                  {editingGalleryId ? 'Update Photo' : 'Add Photo to Gallery'}
+                  <Eye className="w-4 h-4 text-amber-300" />
+                  <span>View Website Gallery ({gallery.length})</span>
                 </button>
-              </form>
+              </div>
             </div>
 
-            <div className="lg:col-span-2 space-y-4">
-              <h3 className="font-cinzel font-bold text-slate-900 text-lg">Campus Photo Gallery ({gallery.length})</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {gallery.map(g => (
-                  <div key={g.id} className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm flex flex-col justify-between">
-                    <div>
-                      <div className="h-44 bg-stone-100 relative overflow-hidden">
-                        <img src={g.image} alt={g.title} className="w-full h-full object-cover" />
-                        <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-slate-950/80 text-amber-300 text-[10px] font-bold uppercase">
-                          {g.category}
-                        </span>
-                      </div>
-                      <div className="p-4 space-y-1">
-                        <h4 className="font-bold text-slate-900 text-sm">{g.title}</h4>
-                        <p className="text-xs text-stone-500 line-clamp-2">{g.caption}</p>
-                      </div>
-                    </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-1 bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-sm h-fit">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-cinzel font-bold text-slate-900 text-lg flex items-center space-x-2">
+                    {editingGalleryId ? <Edit3 className="w-5 h-5 text-amber-600" /> : <Plus className="w-5 h-5 text-blue-900" />}
+                    <span>{editingGalleryId ? 'Edit Gallery Picture' : 'Upload Picture with Details'}</span>
+                  </h3>
+                  {editingGalleryId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingGalleryId(null);
+                        setGalTitle('');
+                        setGalImage('');
+                        setGalCaption('');
+                      }}
+                      className="text-xs text-stone-500 hover:text-slate-900 underline cursor-pointer"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                </div>
 
-                    <div className="px-4 py-3 border-t border-stone-100 flex items-center justify-end space-x-2 bg-stone-50/50">
-                      <button
-                        onClick={() => handleEditGalleryClick(g)}
-                        className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
-                      >
-                        <Edit3 className="w-3 h-3" />
-                        <span>Edit</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          deleteGalleryPhoto(g.id);
-                          showToast('success', 'Gallery photo deleted.');
+                <form onSubmit={handleSaveGallery} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1.5">1. Select Picture from Computer *</label>
+                    <label className="w-full border-2 border-dashed border-blue-900/30 hover:border-blue-900 bg-blue-50/40 hover:bg-blue-50/80 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all">
+                      <UploadCloud className="w-7 h-7 text-blue-900 mb-1.5" />
+                      <span className="font-bold text-blue-950 text-xs">Click to Choose Picture from Device</span>
+                      <span className="text-[11px] text-stone-500 mt-0.5">Supports JPG, PNG, WEBP</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async e => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            setIsUploading(true);
+                            const res = await uploadFileToStorage('gallery', f);
+                            setIsUploading(false);
+                            if (res.url) {
+                              setGalImage(res.url);
+                              if (!galTitle.trim()) {
+                                const cleanName = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+                                setGalTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+                              }
+                              showToast('success', 'Picture loaded! Click "Publish Picture to Gallery" below.');
+                            }
+                          }
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                      />
+                    </label>
+                  </div>
+
+                  {galImage && (
+                    <div className="rounded-2xl overflow-hidden border border-stone-200 bg-stone-50 relative">
+                      <img src={galImage} alt="Preview" className="w-full h-40 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setGalImage('')}
+                        className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-slate-900/80 text-white text-[10px] font-bold hover:bg-rose-600 cursor-pointer"
                       >
-                        <Trash2 className="w-3 h-3" />
-                        <span>Delete</span>
+                        Remove
                       </button>
                     </div>
+                  )}
+
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">Or Paste Image URL</label>
+                    <input
+                      type="text"
+                      value={galImage}
+                      onChange={e => setGalImage(e.target.value)}
+                      placeholder="https://... (auto-filled when uploading file)"
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    />
                   </div>
-                ))}
+
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">2. Picture Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={galTitle}
+                      onChange={e => setGalTitle(e.target.value)}
+                      placeholder="e.g. Convocation Ceremony 2025"
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">3. Gallery Category</label>
+                    <select
+                      value={galCategory}
+                      onChange={e => setGalCategory(e.target.value as any)}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    >
+                      <option value="Campus">Campus</option>
+                      <option value="Chapel">Chapel</option>
+                      <option value="Graduation">Graduation</option>
+                      <option value="Library">Library</option>
+                      <option value="Mission">Mission</option>
+                      <option value="Classrooms">Classrooms</option>
+                      <option value="Outreach">Outreach</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-stone-700 mb-1">4. Caption / Description</label>
+                    <textarea
+                      rows={3}
+                      value={galCaption}
+                      onChange={e => setGalCaption(e.target.value)}
+                      placeholder="Describe this campus moment..."
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isUploading}
+                    className="w-full py-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider transition-colors shadow cursor-pointer"
+                  >
+                    {isUploading ? 'Uploading Picture...' : editingGalleryId ? 'Update Gallery Picture' : 'Publish Picture to Gallery'}
+                  </button>
+                </form>
+              </div>
+
+              <div className="lg:col-span-2 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-cinzel font-bold text-slate-900 text-lg">
+                    Website Gallery Pictures ({gallery.length})
+                  </h3>
+                  {gallery.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        gallery.forEach(g => deleteGalleryPhoto(g.id));
+                        showToast('success', 'All gallery pictures removed.');
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs inline-flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Clear All Photos</span>
+                    </button>
+                  )}
+                </div>
+
+                {gallery.length === 0 ? (
+                  <div className="bg-white rounded-3xl border-2 border-dashed border-stone-300 p-12 text-center space-y-3">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto text-amber-700">
+                      <Image className="w-7 h-7" />
+                    </div>
+                    <h4 className="font-cinzel text-lg font-bold text-slate-900">
+                      Gallery is Currently Empty
+                    </h4>
+                    <p className="text-xs text-stone-500 max-w-md mx-auto leading-relaxed">
+                      All previous default photos have been removed. Use the uploader on the left or click <strong>"Quick Upload Pictures from Device"</strong> above to upload pictures that will appear on the website Gallery page.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {gallery.map(g => (
+                      <div key={g.id} className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm flex flex-col justify-between">
+                        <div>
+                          <div className="h-44 bg-stone-100 relative overflow-hidden">
+                            <img src={g.image} alt={g.title} className="w-full h-full object-cover" />
+                            <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-slate-950/80 text-amber-300 text-[10px] font-bold uppercase">
+                              {g.category}
+                            </span>
+                          </div>
+                          <div className="p-4 space-y-1">
+                            <h4 className="font-bold text-slate-900 text-sm">{g.title}</h4>
+                            <p className="text-xs text-stone-500 line-clamp-2">{g.caption}</p>
+                          </div>
+                        </div>
+
+                        <div className="px-4 py-3 border-t border-stone-100 flex items-center justify-end space-x-2 bg-stone-50/50">
+                          <button
+                            onClick={() => handleEditGalleryClick(g)}
+                            className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              deleteGalleryPhoto(g.id);
+                              showToast('success', 'Gallery photo deleted.');
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] inline-flex items-center space-x-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

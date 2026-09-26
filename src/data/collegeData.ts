@@ -11,13 +11,6 @@ import {
   ContactMessage
 } from '../types';
 
-import gradHall2024 from '../assets/images/icbc_grad_hall_2024_1790326259879.jpg';
-import gradCourtyard from '../assets/images/icbc_grad_courtyard_1790326274351.jpg';
-import gradStageService from '../assets/images/icbc_grad_stage_service_1790326295032.jpg';
-import gradOfficialPhoto from '../assets/images/icbc_graduation_1790324006996.jpg';
-import classroomPhoto from '../assets/images/icbc_classroom_1790324037922.jpg';
-import heroBannerPhoto from '../assets/images/icbc_campus_building_1790394522586.jpg';
-
 export const COLLEGE_INFO = {
   name: 'Image of Christ Bible College',
   shortName: 'ICBC Vellore',
@@ -645,106 +638,7 @@ export const INITIAL_EVENTS: EventItem[] = [
   }
 ];
 
-export const INITIAL_GALLERY: GalleryPhoto[] = [
-  {
-    id: 'gal-grad-1',
-    title: 'The Image of Christ Bible College Convocation 2024',
-    category: 'Graduation',
-    image: gradHall2024,
-    caption: 'Official 2024 Graduation Service in the chapel sanctuary with graduating students in academic gowns and Pr. Christopher on stage.'
-  },
-  {
-    id: 'gal-class-1',
-    title: 'Interactive Biblical Training & Classroom Lectures',
-    category: 'Classroom',
-    image: classroomPhoto,
-    caption: 'Students engaged in systematic theology and biblical exegesis with the Scriptures open, equipping for ministerial service.'
-  },
-  {
-    id: 'gal-grad-2',
-    title: 'Graduation Day Fellowship with Families',
-    category: 'Graduation',
-    image: gradCourtyard,
-    caption: 'Graduates standing in joy in the campus courtyard holding the Scriptures, celebrating with families and faculty.'
-  },
-  {
-    id: 'gal-vision-1',
-    title: 'Image of Christ Bible College Campus Building',
-    category: 'Campus',
-    image: heroBannerPhoto,
-    caption: 'Official campus building of Image of Christ Bible College — Equipping lives through the Word of God.'
-  },
-  {
-    id: 'gal-grad-3',
-    title: 'Convocation Stage & Awards Ceremony',
-    category: 'Graduation',
-    image: gradStageService,
-    caption: 'Solemn evening graduation commissioning service conferring diplomas and ministry certificates.'
-  },
-  {
-    id: 'gal-grad-4',
-    title: 'Graduating Cohort Consecration',
-    category: 'Graduation',
-    image: gradOfficialPhoto,
-    caption: 'The graduating cohort standing consecrated and commissioned for pastoral ministry and church planting.'
-  },
-  {
-    id: 'gal-1',
-    title: 'Morning Chapel Worship & Prayer',
-    category: 'Chapel',
-    image: 'https://images.unsplash.com/photo-1543807535-eceef0bc6599?auto=format&fit=crop&w=800&q=80',
-    caption: 'Students and faculty gathering in prayer before the day’s theological lectures.'
-  },
-  {
-    id: 'gal-2',
-    title: 'College Library & Research Wing',
-    category: 'Campus',
-    image: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=800&q=80',
-    caption: 'Housing over 16,000 theological volumes, biblical commentaries, and digital journal archives.'
-  },
-  {
-    id: 'gal-3',
-    title: 'Graduation Day Commissioning Service',
-    category: 'Graduation',
-    image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80',
-    caption: 'Laying on of hands and prayer of consecration for graduating pastors and evangelists.'
-  },
-  {
-    id: 'gal-4',
-    title: 'Weekend Gospel Outreach in Vellore Villages',
-    category: 'Outreach',
-    image: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=800&q=80',
-    caption: 'Students conducting street preaching, medical camps, and vacation Bible schools.'
-  },
-  {
-    id: 'gal-5',
-    title: 'Campus Garden & Fellowship Lawn',
-    category: 'Campus',
-    image: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=800&q=80',
-    caption: 'Serene campus environment at the foot of Calvary Hill, ideal for quiet prayer and meditation.'
-  },
-  {
-    id: 'gal-6',
-    title: 'Student Community Life & Hostel Fellowship',
-    category: 'Student Life',
-    image: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800&q=80',
-    caption: 'Lifelong friendships forged across students representing over 12 Indian states.'
-  },
-  {
-    id: 'gal-7',
-    title: 'Original Languages Exegesis Seminar',
-    category: 'Campus',
-    image: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=800&q=80',
-    caption: 'Interactive classroom discussions on Hebrew syntax and Greek New Testament translation.'
-  },
-  {
-    id: 'gal-8',
-    title: 'Convocation Academic Procession',
-    category: 'Graduation',
-    image: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80',
-    caption: 'The Faculty Board and graduating seniors entering the convocation arena.'
-  }
-];
+export const INITIAL_GALLERY: GalleryPhoto[] = [];
 
 export const INITIAL_DOWNLOADS: DownloadDoc[] = [
   {

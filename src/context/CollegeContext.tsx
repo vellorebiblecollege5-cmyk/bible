@@ -175,7 +175,7 @@ const STORAGE_KEYS = {
   COURSES: 'icbc_courses_v2',
   FACULTY: 'icbc_faculty_v2',
   DOWNLOADS: 'icbc_downloads_v2',
-  GALLERY: 'icbc_gallery_v3',
+  GALLERY: 'icbc_gallery_v4_empty',
   UPLOADED_FILES: 'icbc_uploaded_files_v2',
   AUTH_USER: 'icbc_auth_user_v2',
   STUDENT_AUTH: 'icbc_student_auth_v2'
@@ -588,8 +588,54 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
 
-    // Fallback URL generator when offline or before storage bucket creation
-    const fallbackUrl = URL.createObjectURL(file);
+    // Convert image files to persistent compressed Data URLs so uploaded gallery photos survive page reloads
+    const getPersistentFileUrl = (f: File): Promise<string> => {
+      return new Promise(resolve => {
+        if (!f.type.startsWith('image/')) {
+          resolve(URL.createObjectURL(f));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          const img = new window.Image();
+          img.onload = () => {
+            try {
+              const maxDim = 1280;
+              let w = img.width;
+              let h = img.height;
+              if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                  h = Math.round((h * maxDim) / w);
+                  w = maxDim;
+                } else {
+                  w = Math.round((w * maxDim) / h);
+                  h = maxDim;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.82));
+                return;
+              }
+            } catch {
+              // fallback to raw dataUrl
+            }
+            resolve(dataUrl);
+          };
+          img.onerror = () => resolve(dataUrl);
+          img.src = dataUrl;
+        };
+        reader.onerror = () => resolve(URL.createObjectURL(f));
+        reader.readAsDataURL(f);
+      });
+    };
+
+    const fallbackUrl = await getPersistentFileUrl(file);
     const newFile: UploadedStorageFile = {
       name: file.name,
       bucket: bucket,
