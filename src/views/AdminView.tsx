@@ -1024,7 +1024,8 @@ export const AdminView: React.FC = () => {
         pastorName: appFormPastor || 'Pr. Christopher',
         pastorPhone: appFormPastorPhone || '+91 95004 23126',
         personalTestimony: appFormTestimony || 'Committed to serving Christ.',
-        ministryCalling: appFormCalling || 'Pastoral Ministry'
+        ministryCalling: appFormCalling || 'Pastoral Ministry',
+        status: appFormStatus
       });
       showToast('success', `New admission application created for ${appFormName}.`);
     }

@@ -8,11 +8,19 @@ export const GalleryView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [activePhoto, setActivePhoto] = useState<GalleryPhoto | null>(null);
 
-  const categories = ['All', 'Campus', 'Chapel', 'Graduation', 'Classroom', 'Outreach', 'Student Life'];
+  const baseCategories = ['All', 'Campus', 'Chapel', 'Graduation', 'Library', 'Mission', 'Classrooms', 'Outreach'];
+  const dynamicCategories = Array.from(
+    new Set([...baseCategories, ...gallery.map(p => p.category).filter(Boolean)])
+  );
 
-  const filteredPhotos = selectedCategory === 'All'
-    ? gallery
-    : gallery.filter(p => p.category === selectedCategory);
+  const filteredPhotos =
+    selectedCategory === 'All'
+      ? gallery
+      : gallery.filter(
+          p =>
+            p.category === selectedCategory ||
+            (selectedCategory === 'Classrooms' && p.category === ('Classroom' as any))
+        );
 
   const isAdmin =
     currentUser && (currentUser.role === 'super_admin' || currentUser.role === 'admin' || currentUser.role === 'faculty');
@@ -48,7 +56,7 @@ export const GalleryView: React.FC = () => {
       {/* Filter Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-center gap-2 border-b border-stone-200 pb-4">
-          {categories.map((cat, idx) => (
+          {dynamicCategories.map((cat, idx) => (
             <button
               key={idx}
               onClick={() => setSelectedCategory(cat)}

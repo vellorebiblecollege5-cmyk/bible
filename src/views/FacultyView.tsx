@@ -35,18 +35,21 @@ export const FacultyView: React.FC = () => {
       </div>
 
       {/* Main Faculty Showcase */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         {faculty.map(member => (
           <div
             key={member.id}
             className="bg-white rounded-3xl border border-stone-200 shadow-md p-8 sm:p-10 space-y-6"
           >
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8 text-center sm:text-left">
-              {/* Dignified Official College Seal / Cross Emblem instead of personal photo */}
+              {/* Faculty Photo or Official College Seal */}
               <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-amber-500 shadow-md bg-white p-1 flex-shrink-0">
                 <img
-                  src={officialLogo}
-                  alt="Image of Christ Bible College Official Seal"
+                  src={member.photo || officialLogo}
+                  onError={e => {
+                    (e.currentTarget as HTMLImageElement).src = officialLogo;
+                  }}
+                  alt={member.name}
                   className="w-full h-full object-cover rounded-full"
                 />
               </div>
@@ -54,9 +57,16 @@ export const FacultyView: React.FC = () => {
               {/* Information */}
               <div className="space-y-3 flex-1">
                 <div>
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-amber-100 text-amber-900 inline-block mb-1">
-                    {member.department}
-                  </span>
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                    <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-amber-100 text-amber-900 inline-block">
+                      {member.department}
+                    </span>
+                    {member.yearsOfExperience > 0 && (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-900 border border-blue-200 inline-block">
+                        {member.yearsOfExperience}+ Years Experience
+                      </span>
+                    )}
+                  </div>
                   <h2 className="font-cinzel text-2xl sm:text-3xl font-extrabold text-[#0f2444]">
                     {member.name}
                   </h2>

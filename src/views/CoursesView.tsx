@@ -18,6 +18,7 @@ export const CoursesView: React.FC = () => {
     activePage,
     setActivePage,
     courses,
+    subjectsList,
     setSelectedCourseForApply,
     setActiveDocumentPreview
   } = useCollege();
@@ -246,6 +247,57 @@ export const CoursesView: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Curriculum Subjects Directory (Live from Admin Panel) */}
+      {subjectsList.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
+            <div className="p-6 sm:p-8 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#faf8f5]">
+              <div>
+                <span className="text-xs uppercase tracking-widest text-amber-800 font-bold block">
+                  Theological Course Modules
+                </span>
+                <h2 className="font-cinzel text-xl sm:text-2xl font-bold text-[#0f2444]">
+                  Curriculum Subjects & Credit Directory ({subjectsList.length})
+                </h2>
+              </div>
+              <span className="px-3 py-1.5 rounded-xl bg-blue-900 text-amber-300 text-xs font-bold uppercase tracking-wider w-fit">
+                Updated Live from Academic Office
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-stone-50 text-slate-700 font-bold uppercase tracking-wider border-b border-stone-200">
+                  <tr>
+                    <th className="px-5 py-3.5">Subject Code</th>
+                    <th className="px-5 py-3.5">Subject Title</th>
+                    <th className="px-5 py-3.5">Program</th>
+                    <th className="px-5 py-3.5">Semester / Year</th>
+                    <th className="px-5 py-3.5">Credits</th>
+                    <th className="px-5 py-3.5">Assigned Faculty</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {subjectsList.map(sub => (
+                    <tr key={sub.id} className="hover:bg-stone-50/80 transition-colors">
+                      <td className="px-5 py-3.5 font-mono font-bold text-blue-950">{sub.subjectCode}</td>
+                      <td className="px-5 py-3.5 font-bold text-slate-900">{sub.subjectName}</td>
+                      <td className="px-5 py-3.5">
+                        <span className="px-2.5 py-1 rounded-lg bg-stone-100 font-semibold uppercase text-stone-700">
+                          {sub.courseId}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-stone-600">{sub.semesterOrYear}</td>
+                      <td className="px-5 py-3.5 font-bold text-amber-800">{sub.credits} Credits</td>
+                      <td className="px-5 py-3.5 text-stone-700">{sub.facultyName}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Course Detail Modal */}
       {selectedCourseModal && (

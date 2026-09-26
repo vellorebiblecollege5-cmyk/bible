@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   Course,
   FacultyMember,
@@ -143,7 +143,11 @@ interface CollegeContextType {
   deleteDownload: (id: string) => Promise<void>;
   recordDownload: (id: string) => void;
   applications: ApplicationSubmission[];
-  submitApplication: (app: Omit<ApplicationSubmission, 'id' | 'applicationNo' | 'submittedAt' | 'status'>) => Promise<string>;
+  submitApplication: (
+    app: Omit<ApplicationSubmission, 'id' | 'applicationNo' | 'submittedAt' | 'status'> & {
+      status?: ApplicationSubmission['status'];
+    }
+  ) => Promise<string>;
   updateApplication: (id: string, updates: Partial<ApplicationSubmission>) => Promise<void>;
   updateApplicationStatus: (id: string, status: ApplicationSubmission['status'], notes?: string) => Promise<void>;
   deleteApplication: (id: string) => Promise<void>;
@@ -317,12 +321,36 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return INITIAL_CONTACT_MESSAGES;
   });
 
+  const clientSessionId = useRef(`tab-${Date.now()}-${Math.random().toString(36).slice(2)}`).current;
+
   // Helper to push updates to persistent Supabase server store & broadcast to all open website tabs
   const pushToSupabaseBackend = async (payload: Record<string, any[]>) => {
     try {
+      if (Array.isArray(payload.courses)) localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(payload.courses));
+      if (Array.isArray(payload.faculty)) localStorage.setItem(STORAGE_KEYS.FACULTY, JSON.stringify(payload.faculty));
+      if (Array.isArray(payload.students)) localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(payload.students));
+      if (Array.isArray(payload.subjects)) localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(payload.subjects));
+      if (Array.isArray(payload.admissions)) localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(payload.admissions));
+      if (Array.isArray(payload.notices)) localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(payload.notices));
+      if (Array.isArray(payload.events)) localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(payload.events));
+      if (Array.isArray(payload.study_materials)) localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(payload.study_materials));
+      if (Array.isArray(payload.gallery)) localStorage.setItem(STORAGE_KEYS.GALLERY, JSON.stringify(payload.gallery));
+      if (Array.isArray(payload.downloads)) localStorage.setItem(STORAGE_KEYS.DOWNLOADS, JSON.stringify(payload.downloads));
+      if (Array.isArray(payload.contact_messages)) localStorage.setItem(STORAGE_KEYS.CONTACT, JSON.stringify(payload.contact_messages));
+      if (Array.isArray(payload.uploaded_files)) localStorage.setItem(STORAGE_KEYS.UPLOADED_FILES, JSON.stringify(payload.uploaded_files));
+    } catch {
+      // ignore localStorage quota errors
+    }
+
+    try {
       if (typeof BroadcastChannel !== 'undefined') {
         const bc = new BroadcastChannel('icbc_supabase_realtime');
-        bc.postMessage({ type: 'SUPABASE_REALTIME_SYNC', state: payload, updatedAt: new Date().toISOString() });
+        bc.postMessage({
+          type: 'SUPABASE_REALTIME_SYNC',
+          senderId: clientSessionId,
+          state: payload,
+          updatedAt: new Date().toISOString()
+        });
         bc.close();
       }
     } catch {
@@ -333,7 +361,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       await fetch('/api/supabase/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ ...payload, _senderId: clientSessionId })
       });
       setSupabaseStatus(prev => ({
         ...prev,
@@ -393,6 +421,15 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(studentsList));
+    if (studentProfile) {
+      const updatedSelf = studentsList.find(
+        s => s.id === studentProfile.id || s.regNo.toLowerCase() === studentProfile.regNo.toLowerCase()
+      );
+      if (updatedSelf && JSON.stringify(updatedSelf) !== JSON.stringify(studentProfile)) {
+        setStudentProfile(updatedSelf);
+        localStorage.setItem('icbc_student_profile', JSON.stringify(updatedSelf));
+      }
+    }
   }, [studentsList]);
 
   useEffect(() => {
@@ -431,8 +468,10 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem(STORAGE_KEYS.STUDENT_AUTH, JSON.stringify(isStudentLoggedIn));
   }, [isStudentLoggedIn]);
 
-  // Listen to Supabase Auth State changes on mount if connected
+  // Listen to Supabase Auth State changes on mount if connected to external Supabase
   useEffect(() => {
+    const cfg = getSavedSupabaseConfig();
+    if (!isExternalSupabaseUrl(cfg.url)) return;
     const client = getSupabaseClient();
     if (!client) return;
 
@@ -623,24 +662,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     bucket: StorageBucket,
     file: File
   ): Promise<{ url: string; error?: string }> => {
-    const client = getSupabaseClient();
-    if (client) {
-      const result = await uploadToSupabaseStorage(bucket, file);
-      if (result.url) {
-        const newFile: UploadedStorageFile = {
-          name: file.name,
-          bucket: bucket,
-          url: result.url,
-          size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-          uploadedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        };
-        setUploadedFiles(prev => [newFile, ...prev]);
-        return { url: result.url };
-      }
-      // fallback to persistent Data URL
-    }
-
-    // Convert image files to persistent compressed Data URLs so uploaded gallery photos survive page reloads
+    // Convert image files to persistent compressed Data URLs so uploaded gallery/faculty/student photos survive page reloads and always render
     const getPersistentFileUrl = (f: File): Promise<string> => {
       return new Promise(resolve => {
         if (!f.type.startsWith('image/')) {
@@ -690,11 +712,21 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       });
     };
 
-    const fallbackUrl = await getPersistentFileUrl(file);
+    let finalUrl = await getPersistentFileUrl(file);
+
+    const cfg = getSavedSupabaseConfig();
+    const client = getSupabaseClient();
+    if (client && isExternalSupabaseUrl(cfg.url)) {
+      const result = await uploadToSupabaseStorage(bucket, file);
+      if (result.url) {
+        finalUrl = result.url;
+      }
+    }
+
     const newFile: UploadedStorageFile = {
       name: file.name,
       bucket: bucket,
-      url: fallbackUrl,
+      url: finalUrl,
       size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
       uploadedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     };
@@ -703,7 +735,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       pushToSupabaseBackend({ uploaded_files: next });
       return next;
     });
-    return { url: fallbackUrl };
+    return { url: finalUrl };
   };
 
   const addUploadedFileManual = (file: UploadedStorageFile) => {
@@ -943,6 +975,70 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  // Merge helper: preserves user-added localStorage items if server store doesn't have them yet
+  const mergeAndSyncInitialState = (serverState: any) => {
+    if (!serverState || typeof serverState !== 'object') return;
+    const mergeById = <T extends { id: string }>(localArr: T[], remoteArr: T[] | undefined): { merged: T[]; localHasExtra: boolean } => {
+      if (!Array.isArray(remoteArr)) return { merged: localArr, localHasExtra: false };
+      const remoteIds = new Set(remoteArr.map(item => item.id));
+      const extraLocal = localArr.filter(item => item && item.id && !remoteIds.has(item.id));
+      if (extraLocal.length > 0) {
+        return { merged: [...extraLocal, ...remoteArr], localHasExtra: true };
+      }
+      return { merged: remoteArr, localHasExtra: false };
+    };
+
+    const toPush: Record<string, any[]> = {};
+
+    const crs = mergeById(courses, serverState.courses);
+    setCourses(crs.merged);
+    if (crs.localHasExtra) toPush.courses = crs.merged;
+
+    const fac = mergeById(faculty, serverState.faculty);
+    setFaculty(fac.merged);
+    if (fac.localHasExtra) toPush.faculty = fac.merged;
+
+    const std = mergeById(studentsList, serverState.students);
+    setStudentsList(std.merged);
+    if (std.localHasExtra) toPush.students = std.merged;
+
+    const sub = mergeById(subjectsList, serverState.subjects);
+    setSubjectsList(sub.merged);
+    if (sub.localHasExtra) toPush.subjects = sub.merged;
+
+    const adm = mergeById(applications, serverState.admissions);
+    setApplications(adm.merged);
+    if (adm.localHasExtra) toPush.admissions = adm.merged;
+
+    const not = mergeById(notices, serverState.notices);
+    setNotices(not.merged);
+    if (not.localHasExtra) toPush.notices = not.merged;
+
+    const ev = mergeById(events, serverState.events);
+    setEvents(ev.merged);
+    if (ev.localHasExtra) toPush.events = ev.merged;
+
+    const mat = mergeById(studyMaterials, serverState.study_materials);
+    setStudyMaterials(mat.merged);
+    if (mat.localHasExtra) toPush.study_materials = mat.merged;
+
+    const gal = mergeById(gallery, serverState.gallery);
+    setGallery(gal.merged);
+    if (gal.localHasExtra) toPush.gallery = gal.merged;
+
+    const dl = mergeById(downloads, serverState.downloads);
+    setDownloads(dl.merged);
+    if (dl.localHasExtra) toPush.downloads = dl.merged;
+
+    const msg = mergeById(contactMessages, serverState.contact_messages);
+    setContactMessages(msg.merged);
+    if (msg.localHasExtra) toPush.contact_messages = msg.merged;
+
+    if (Object.keys(toPush).length > 0) {
+      pushToSupabaseBackend(toPush);
+    }
+  };
+
   // Sync with Supabase on mount or when requested
   const syncWithSupabase = async () => {
     // 1. Always sync with persistent server-side Supabase engine first
@@ -951,7 +1047,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (res.ok) {
         const data = await res.json();
         if (data?.state) {
-          applyRealtimeState(data.state);
+          mergeAndSyncInitialState(data.state);
         }
       }
     } catch (err) {
@@ -1173,8 +1269,16 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         es.onmessage = event => {
           try {
             const parsed = JSON.parse(event.data);
-            if (parsed?.state) {
-              applyRealtimeState(parsed.state);
+            if (parsed?.type === 'SUPABASE_REALTIME_SYNC') {
+              // Skip if this tab was the sender (already applied optimistically)
+              if (parsed.senderId && parsed.senderId === clientSessionId) {
+                return;
+              }
+              if (parsed.state) {
+                applyRealtimeState(parsed.state);
+              }
+            } else if (parsed?.type === 'SUPABASE_CONNECTED' && parsed?.state) {
+              mergeAndSyncInitialState(parsed.state);
             } else if (parsed?.type === 'HEARTBEAT') {
               setSupabaseStatus(prev => ({
                 ...prev,
@@ -1204,6 +1308,9 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (typeof BroadcastChannel !== 'undefined') {
         bc = new BroadcastChannel('icbc_supabase_realtime');
         bc.onmessage = ev => {
+          if (ev.data?.senderId && ev.data.senderId === clientSessionId) {
+            return;
+          }
           if (ev.data?.state) {
             applyRealtimeState(ev.data.state);
           }
@@ -1829,12 +1936,15 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Submit Admission Application
   const submitApplication = async (
-    appData: Omit<ApplicationSubmission, 'id' | 'applicationNo' | 'submittedAt' | 'status'>
+    appData: Omit<ApplicationSubmission, 'id' | 'applicationNo' | 'submittedAt' | 'status'> & {
+      status?: ApplicationSubmission['status'];
+    }
   ): Promise<string> => {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const courseCode = appData.courseId.toUpperCase();
     const appNo = `IOCBC-2026-${courseCode}-${randomSuffix}`;
     const id = `app-${Date.now()}`;
+    const finalStatus = appData.status || 'Under Review';
 
     const newApp: ApplicationSubmission = {
       ...appData,
@@ -1847,7 +1957,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         hour: '2-digit',
         minute: '2-digit'
       }),
-      status: 'Under Review'
+      status: finalStatus
     };
 
     setApplications(prev => {

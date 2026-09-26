@@ -34,6 +34,7 @@ export const StudentsView: React.FC = () => {
     isStudentLoggedIn,
     loginStudent,
     logoutStudent,
+    studentsList,
     studyMaterials,
     notices,
     subjectsList,
@@ -235,12 +236,174 @@ export const StudentsView: React.FC = () => {
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full py-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold text-xs uppercase tracking-wider transition-all shadow flex items-center justify-center space-x-2"
+                className="w-full py-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold text-xs uppercase tracking-wider transition-all shadow flex items-center justify-center space-x-2 cursor-pointer"
               >
                 <UserCheck className="w-4 h-4" />
                 <span>{authLoading ? 'Signing In...' : 'Access Student Dashboard'}</span>
               </button>
             </form>
+          </div>
+        </div>
+
+        {/* Live Student Hub Sections (Enrolled Students, Notice Board, Study Notes, Subjects) */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 pt-4">
+          {/* 1. Enrolled Students Directory */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-200 pb-3">
+              <div>
+                <span className="text-xs uppercase tracking-widest text-amber-800 font-bold block">
+                  Official Registry
+                </span>
+                <h2 className="font-cinzel text-2xl font-bold text-[#0f2444]">
+                  Enrolled Students Directory ({studentsList.length})
+                </h2>
+              </div>
+              <span className="text-xs text-stone-500">
+                Click any student card to view their academic portal
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {studentsList.map(std => (
+                <div
+                  key={std.id}
+                  className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-4">
+                      <img
+                        src={std.avatar}
+                        alt={std.name}
+                        className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-500/40 shadow-sm shrink-0"
+                      />
+                      <div>
+                        <span className="font-mono text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-bold">
+                          {std.regNo}
+                        </span>
+                        <h3 className="font-cinzel font-bold text-slate-900 text-base mt-0.5">
+                          {std.name}
+                        </h3>
+                        <p className="text-xs text-amber-800 font-semibold">{std.courseTitle}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-100 text-xs">
+                      <div className="bg-stone-50 p-2.5 rounded-xl">
+                        <span className="text-[10px] uppercase text-stone-400 font-bold block">GPA Standing</span>
+                        <span className="font-bold text-slate-900">{std.gpa}</span>
+                      </div>
+                      <div className="bg-stone-50 p-2.5 rounded-xl">
+                        <span className="text-[10px] uppercase text-stone-400 font-bold block">Attendance</span>
+                        <span className="font-bold text-emerald-700">{std.attendancePercent}%</span>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-stone-600 space-y-0.5">
+                      <div><strong>Year:</strong> {std.currentYear}</div>
+                      <div><strong>Batch:</strong> {std.batch}</div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => loginStudent(std.regNo)}
+                    className="w-full py-2.5 rounded-xl bg-stone-100 hover:bg-blue-900 text-slate-800 hover:text-amber-300 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Open Student Portal</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Official Campus Notice Board */}
+          <div className="space-y-4">
+            <div className="border-b border-stone-200 pb-3">
+              <span className="text-xs uppercase tracking-widest text-amber-800 font-bold block">
+                Registrar Announcements
+              </span>
+              <h2 className="font-cinzel text-2xl font-bold text-[#0f2444]">
+                Campus Notice Board ({notices.length})
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {notices.map(n => (
+                <div
+                  key={n.id}
+                  className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {n.isUrgent && (
+                        <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold text-[10px] uppercase">
+                          Urgent
+                        </span>
+                      )}
+                      <span className="px-2.5 py-0.5 rounded bg-blue-50 text-blue-900 font-bold text-[10px] uppercase">
+                        {n.category}
+                      </span>
+                    </div>
+                    <span className="text-xs text-stone-400">{n.date}</span>
+                  </div>
+                  <h3 className="font-cinzel font-bold text-slate-900 text-base">{n.title}</h3>
+                  <p className="text-xs text-stone-600 leading-relaxed">{n.content}</p>
+                  {n.postedBy && (
+                    <div className="text-[11px] text-stone-400 pt-1">Posted by: {n.postedBy}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. Lecture Notes & Study Materials */}
+          <div className="space-y-4">
+            <div className="border-b border-stone-200 pb-3">
+              <span className="text-xs uppercase tracking-widest text-amber-800 font-bold block">
+                Theological E-Library
+              </span>
+              <h2 className="font-cinzel text-2xl font-bold text-[#0f2444]">
+                Study Notes & Lecture PDFs ({studyMaterials.length})
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {studyMaterials.map(m => (
+                <div
+                  key={m.id}
+                  className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm flex flex-col justify-between space-y-4"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="px-2.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[10px] uppercase">
+                        {m.courseCode} • {m.type}
+                      </span>
+                      <span className="text-stone-400 font-mono text-[11px]">{m.fileSize}</span>
+                    </div>
+                    <h3 className="font-cinzel font-bold text-slate-900 text-base">{m.title}</h3>
+                    <p className="text-xs text-amber-800 font-medium">
+                      {m.subject} • {m.facultyName}
+                    </p>
+                    <p className="text-xs text-stone-600 leading-relaxed">{m.description}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveDocumentPreview({
+                        title: m.title,
+                        type: m.type,
+                        content: `${m.description}\n\nSubject: ${m.subject}\nInstructor: ${m.facultyName}\nCourse: ${m.courseName}`
+                      })
+                    }
+                    className="w-full py-2 rounded-xl bg-blue-50 hover:bg-blue-900 text-blue-900 hover:text-amber-300 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Read / Download Notes</span>
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

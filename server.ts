@@ -22,7 +22,7 @@ const __dirname = path.dirname(__filename);
 
 const DB_FILE_PATH = path.join(__dirname, 'supabase', 'live-db.json');
 
-interface LiveSupabaseStore {
+export interface LiveSupabaseStore {
   courses: any[];
   faculty: any[];
   students: any[];
@@ -37,6 +37,21 @@ interface LiveSupabaseStore {
   uploaded_files: any[];
   updatedAt: string;
 }
+
+const VALID_TABLES: (keyof LiveSupabaseStore)[] = [
+  'courses',
+  'faculty',
+  'students',
+  'subjects',
+  'admissions',
+  'notices',
+  'events',
+  'study_materials',
+  'gallery',
+  'downloads',
+  'contact_messages',
+  'uploaded_files'
+];
 
 function getInitialStore(): LiveSupabaseStore {
   return {
@@ -92,12 +107,13 @@ let dbStore: LiveSupabaseStore = loadStore();
 // Connected SSE clients for instant real-time website updates
 const sseClients = new Set<express.Response>();
 
-function broadcastRealtimeUpdate(changedTables?: string[]) {
+function broadcastRealtimeUpdate(changedSlice: Record<string, any[]>, senderId?: string) {
   const payload = JSON.stringify({
     type: 'SUPABASE_REALTIME_SYNC',
-    changedTables: changedTables || ['all'],
+    senderId: senderId || '',
+    changedTables: Object.keys(changedSlice),
     updatedAt: dbStore.updatedAt,
-    state: dbStore
+    state: changedSlice
   });
   for (const client of sseClients) {
     try {
@@ -123,7 +139,7 @@ async function startServer() {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
 
-    // Send initial connected state immediately
+    // Send initial connected event
     res.write(
       `data: ${JSON.stringify({
         type: 'SUPABASE_CONNECTED',
@@ -159,47 +175,34 @@ async function startServer() {
     });
   });
 
-  // 3. Save / Sync one or more tables from Admin Panel and immediately broadcast to all website visitors
+  // 3. Save / Sync one or more tables from Admin Panel and immediately broadcast ONLY the changed tables
   app.post('/api/supabase/sync', (req, res) => {
     const updates = req.body || {};
-    const validKeys: (keyof LiveSupabaseStore)[] = [
-      'courses',
-      'faculty',
-      'students',
-      'subjects',
-      'admissions',
-      'notices',
-      'events',
-      'study_materials',
-      'gallery',
-      'downloads',
-      'contact_messages',
-      'uploaded_files'
-    ];
+    const senderId = typeof updates._senderId === 'string' ? updates._senderId : undefined;
 
-    const changed: string[] = [];
-    for (const key of validKeys) {
+    const changedSlice: Record<string, any[]> = {};
+    for (const key of VALID_TABLES) {
       if (Array.isArray(updates[key])) {
         (dbStore as any)[key] = updates[key];
-        changed.push(key);
+        changedSlice[key] = updates[key];
       }
     }
 
-    if (changed.length > 0) {
+    if (Object.keys(changedSlice).length > 0) {
       saveStore(dbStore);
-      broadcastRealtimeUpdate(changed);
+      broadcastRealtimeUpdate(changedSlice, senderId);
     }
 
     res.json({
       success: true,
       connected: true,
-      changedTables: changed,
+      changedTables: Object.keys(changedSlice),
       updatedAt: dbStore.updatedAt,
-      state: dbStore
+      state: changedSlice
     });
   });
 
-  // 4. Built-in PostgREST-compatible endpoints (/rest/v1/:table) so @supabase/supabase-js works natively out-of-the-box
+  // 4. Built-in PostgREST-compatible endpoints (/rest/v1/:table)
   app.all('/rest/v1/:table', (req, res) => {
     const table = req.params.table as keyof LiveSupabaseStore;
     if (!(table in dbStore) || table === 'updatedAt') {

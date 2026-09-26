@@ -21,7 +21,7 @@ import graduationPhoto from '../assets/images/icbc_graduation_1790324006996.jpg'
 import classroomPhoto from '../assets/images/icbc_classroom_1790324037922.jpg';
 
 export const AboutView: React.FC = () => {
-  const { activePage, setActivePage } = useCollege();
+  const { activePage, setActivePage, faculty } = useCollege();
   
   // Determine sub-tab from context or default
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'vision' | 'leadership' | 'faith'>('overview');
@@ -378,45 +378,61 @@ export const AboutView: React.FC = () => {
           <div className="space-y-8 animate-in fade-in duration-200">
             <div className="text-center space-y-2">
               <span className="text-xs uppercase tracking-widest text-amber-800 font-bold">
-                College Leadership
+                College Leadership & Faculty
               </span>
               <h2 className="font-cinzel text-2xl sm:text-3xl font-extrabold text-[#0f2444]">
-                Principal & President
+                Principal, President & Faculty
               </h2>
             </div>
 
-            {/* Principal Feature Card */}
-            <div className="max-w-3xl mx-auto bg-white rounded-3xl border border-stone-200 p-8 shadow-sm">
-              <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
-                <div className="w-28 h-28 rounded-full overflow-hidden border-3 border-amber-500 flex-shrink-0 shadow-md bg-white p-1">
-                  <img
-                    src={officialLogo}
-                    alt="Image of Christ Bible College Official Crest"
-                    className="w-full h-full object-cover rounded-full"
-                  />
-                </div>
-                <div className="space-y-2 flex-1">
-                  <h3 className="font-cinzel text-xl sm:text-2xl font-bold text-[#0f2444]">
-                    Pr. Christopher
-                  </h3>
-                  <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">
-                    Principal & President, ICBC Vellore
-                  </p>
-                  <p className="text-xs text-stone-600 leading-relaxed">
-                    Committed to fulfilling the Great Commission and the mandate of John 17:18. Under his leadership, ICBC equips servants across Tamil Nadu and beyond through residential, online, and blended theological curricula.
-                  </p>
-                  <div className="pt-2 flex flex-wrap gap-4 text-xs font-semibold text-[#0f2444]">
-                    <a href="tel:+919500423126" className="flex items-center hover:text-amber-700">
-                      <Phone className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                      <span>ph. 95004 23126</span>
-                    </a>
-                    <a href="mailto:icbc.vellore@gmail.com" className="flex items-center hover:text-amber-700">
-                      <Mail className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                      <span>icbc.vellore@gmail.com</span>
-                    </a>
+            <div className="max-w-4xl mx-auto space-y-6">
+              {faculty.map(member => (
+                <div key={member.id} className="bg-white rounded-3xl border border-stone-200 p-8 shadow-sm">
+                  <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
+                    <div className="w-28 h-28 rounded-full overflow-hidden border-3 border-amber-500 flex-shrink-0 shadow-md bg-white p-1">
+                      <img
+                        src={member.photo || officialLogo}
+                        onError={e => {
+                          (e.currentTarget as HTMLImageElement).src = officialLogo;
+                        }}
+                        alt={member.name}
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                    </div>
+                    <div className="space-y-2 flex-1">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900">
+                          {member.department}
+                        </span>
+                        {member.degrees && (
+                          <span className="text-xs text-stone-500 font-semibold">
+                            • {member.degrees}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-cinzel text-xl sm:text-2xl font-bold text-[#0f2444]">
+                        {member.name}
+                      </h3>
+                      <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">
+                        {member.role}
+                      </p>
+                      <p className="text-xs text-stone-600 leading-relaxed">
+                        {member.bio}
+                      </p>
+                      <div className="pt-2 flex flex-wrap justify-center sm:justify-start gap-4 text-xs font-semibold text-[#0f2444]">
+                        <a href="tel:+919500423126" className="flex items-center hover:text-amber-700">
+                          <Phone className="w-3.5 h-3.5 mr-1 text-amber-600" />
+                          <span>ph. 95004 23126</span>
+                        </a>
+                        <a href="mailto:icbc.vellore@gmail.com" className="flex items-center hover:text-amber-700">
+                          <Mail className="w-3.5 h-3.5 mr-1 text-amber-600" />
+                          <span>icbc.vellore@gmail.com</span>
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         )}

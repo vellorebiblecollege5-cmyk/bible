@@ -129,10 +129,13 @@ export const AdmissionsView: React.FC = () => {
   const handleTrackSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSearched(true);
+    const q = trackQuery.toLowerCase().trim();
     const match = applications.find(
       a =>
-        a.applicationNo.toLowerCase().trim() === trackQuery.toLowerCase().trim() ||
-        a.email.toLowerCase().trim() === trackQuery.toLowerCase().trim()
+        a.applicationNo.toLowerCase().includes(q) ||
+        a.email.toLowerCase().includes(q) ||
+        a.fullName.toLowerCase().includes(q) ||
+        a.phone.toLowerCase().includes(q)
     );
     setFoundApplication(match || null);
   };
@@ -549,72 +552,33 @@ export const AdmissionsView: React.FC = () => {
             </div>
 
             <div className="space-y-6">
-              <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-cinzel text-lg font-bold text-blue-900">
-                    Bachelor of Theology (B.Th) – 3 Years
-                  </h3>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 font-bold">
-                    Undergraduate
-                  </span>
+              {courses.map(course => (
+                <div key={course.id} className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-cinzel text-lg font-bold text-blue-900">
+                      {course.title} ({course.code}) – {course.duration}
+                    </h3>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 font-bold shrink-0">
+                      {course.level}
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-600 leading-relaxed">{course.description}</p>
+                  <ul className="text-xs space-y-2 text-stone-700">
+                    <li className="flex items-start">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
+                      <span><strong>Academic Requirement:</strong> {course.eligibility}</span>
+                    </li>
+                    <li className="flex items-start">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
+                      <span><strong>Mode & Medium:</strong> {course.mode} • {course.language} ({course.totalCredits} Credits)</span>
+                    </li>
+                    <li className="flex items-start">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
+                      <span><strong>Endorsement:</strong> Personal salvation testimony and recommendation from local church pastor.</span>
+                    </li>
+                  </ul>
                 </div>
-                <ul className="text-xs space-y-2 text-stone-700">
-                  <li className="flex items-start">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
-                    <span><strong>Academic:</strong> Higher Secondary Course (10+2 / Intermediate / HSC) pass from any recognized State or Central Board with minimum 45% marks.</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
-                    <span><strong>Spiritual:</strong> Clear personal testimony of salvation, believer’s water baptism by immersion, and active church membership.</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
-                    <span><strong>Endorsement:</strong> Confidential recommendation letter signed by the candidate’s local church pastor.</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-cinzel text-lg font-bold text-blue-900">
-                    Master of Divinity (M.Div) – 3 Years (2 Yrs for B.Th)
-                  </h3>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 font-bold">
-                    Post-Graduate
-                  </span>
-                </div>
-                <ul className="text-xs space-y-2 text-stone-700">
-                  <li className="flex items-start">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
-                    <span><strong>Academic:</strong> Any recognized secular Bachelor’s Degree (B.A, B.Sc, B.Com, B.Tech, etc.) or a B.Th degree with a minimum Grade B average from a recognized theological institution.</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
-                    <span><strong>Ministry Call:</strong> Evident calling to pastoral ministry, cross-cultural missions, or theological education.</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-cinzel text-lg font-bold text-blue-900">
-                    Certificate in Biblical Studies (CBS) – 1 Year
-                  </h3>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">
-                    Certificate
-                  </span>
-                </div>
-                <ul className="text-xs space-y-2 text-stone-700">
-                  <li className="flex items-start">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
-                    <span><strong>Academic:</strong> 10th Standard (SSLC) pass or equivalent. Basic ability to read and write in Tamil or English.</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
-                    <span><strong>Target Audience:</strong> Lay leaders, elders, Sunday School mentors, youth leaders, and marketplace witnesses.</span>
-                  </li>
-                </ul>
-              </div>
+              ))}
             </div>
 
             <div className="text-center pt-2">
@@ -656,30 +620,16 @@ export const AdmissionsView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-200 text-stone-700">
-                    <tr className="hover:bg-stone-50">
-                      <td className="p-4 font-bold text-slate-900">Bachelor of Theology (B.Th)</td>
-                      <td className="p-4">₹18,500</td>
-                      <td className="p-4">₹10,000 / year</td>
-                      <td className="p-4 font-bold text-amber-800">₹28,500 / year</td>
-                    </tr>
-                    <tr className="hover:bg-stone-50">
-                      <td className="p-4 font-bold text-slate-900">Master of Divinity (M.Div)</td>
-                      <td className="p-4">₹24,000</td>
-                      <td className="p-4">₹12,000 / year</td>
-                      <td className="p-4 font-bold text-amber-800">₹36,000 / year</td>
-                    </tr>
-                    <tr className="hover:bg-stone-50">
-                      <td className="p-4 font-bold text-slate-900">Certificate in Biblical Studies</td>
-                      <td className="p-4">₹10,500</td>
-                      <td className="p-4">₹4,000 / year</td>
-                      <td className="p-4 font-bold text-amber-800">₹14,500 total</td>
-                    </tr>
-                    <tr className="hover:bg-stone-50">
-                      <td className="p-4 font-bold text-slate-900">Modular Short Courses</td>
-                      <td className="p-4">₹3,500 – ₹4,500</td>
-                      <td className="p-4">Day Scholar Track</td>
-                      <td className="p-4 font-bold text-amber-800">Per Course Fee</td>
-                    </tr>
+                    {courses.map(course => (
+                      <tr key={course.id} className="hover:bg-stone-50">
+                        <td className="p-4 font-bold text-slate-900">
+                          {course.title} ({course.code})
+                        </td>
+                        <td className="p-4">{course.annualTuition}</td>
+                        <td className="p-4">{course.mode}</td>
+                        <td className="p-4 font-bold text-amber-800">{course.duration} ({course.totalCredits} Cr)</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -805,6 +755,53 @@ export const AdmissionsView: React.FC = () => {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Live Admission Applications Status Board */}
+            {applications.length > 0 && (
+              <div className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-stone-200 bg-[#faf8f5] flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-widest text-amber-800 font-bold block">
+                      Registrar Live Feed
+                    </span>
+                    <h3 className="font-cinzel text-base font-bold text-slate-900">
+                      Submitted Applications Status ({applications.length})
+                    </h3>
+                  </div>
+                </div>
+                <div className="divide-y divide-stone-100">
+                  {applications.map(app => (
+                    <div
+                      key={app.id}
+                      onClick={() => {
+                        setFoundApplication(app);
+                        setSearched(true);
+                      }}
+                      className="p-4 hover:bg-stone-50 transition-colors flex flex-wrap items-center justify-between gap-3 text-xs cursor-pointer"
+                    >
+                      <div>
+                        <span className="font-mono font-bold text-blue-900">{app.applicationNo}</span>
+                        <div className="font-bold text-slate-900 mt-0.5">{app.fullName}</div>
+                        <div className="text-[11px] text-stone-500">
+                          Program: <span className="uppercase font-semibold">{app.courseId}</span> • {app.submittedAt}
+                        </div>
+                      </div>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          app.status === 'Admitted'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : app.status === 'Interview Scheduled'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {app.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
