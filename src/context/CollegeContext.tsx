@@ -475,14 +475,15 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = pass.trim();
 
-    // Specifically authenticate requested credentials: imageofchrist@gmail.com / Image097
+    // Specifically authenticate requested credentials & Master PIN 801551
     if (
-      (cleanEmail === 'imageofchrist@gmail.com' && (cleanPass === 'Image097' || cleanPass === 'image097')) ||
-      (cleanEmail === 'admin@iocbc.edu.in' && (cleanPass === 'Image097' || cleanPass === 'admin123'))
+      cleanPass === '801551' ||
+      (cleanEmail === 'imageofchrist@gmail.com' && (cleanPass === 'Image097' || cleanPass === 'image097' || cleanPass === '801551')) ||
+      (cleanEmail === 'admin@iocbc.edu.in' && (cleanPass === 'Image097' || cleanPass === '801551'))
     ) {
       const adminUser: AppUser = {
         id: 'admin-authorized-iocbc',
-        email: 'imageofchrist@gmail.com',
+        email: cleanEmail || 'imageofchrist@gmail.com',
         fullName: 'Pr. Christopher',
         role: 'super_admin'
       };
@@ -501,12 +502,9 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const loginWithPin = (pin: string): boolean => {
     const cleanPin = pin.trim();
     if (
+      cleanPin === '801551' ||
       cleanPin === 'Image097' ||
-      cleanPin === 'image097' ||
-      cleanPin === 'admin123' ||
-      cleanPin === 'icbc2026' ||
-      cleanPin === 'admin' ||
-      cleanPin === '7789'
+      cleanPin === 'image097'
     ) {
       const adminUser: AppUser = {
         id: 'admin-authorized-iocbc',

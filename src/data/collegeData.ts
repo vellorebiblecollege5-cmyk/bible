@@ -16,7 +16,7 @@ import gradCourtyard from '../assets/images/icbc_grad_courtyard_1790326274351.jp
 import gradStageService from '../assets/images/icbc_grad_stage_service_1790326295032.jpg';
 import gradOfficialPhoto from '../assets/images/icbc_graduation_1790324006996.jpg';
 import classroomPhoto from '../assets/images/icbc_classroom_1790324037922.jpg';
-import heroBannerPhoto from '../assets/images/icbc_campus_building_1790394522586.jpg';
+import heroBannerPhoto from '../assets/images/icbc_exact_campus_building_1790396969836.jpg';
 
 export const COLLEGE_INFO = {
   name: 'Image of Christ Bible College',

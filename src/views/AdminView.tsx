@@ -201,29 +201,33 @@ export const AdminView: React.FC = () => {
     e.preventDefault();
     setAuthError(null);
 
-    if (adminEmail.trim() && adminPass.trim()) {
-      if (loginWithAdminCredentials(adminEmail, adminPass)) {
-        showToast('success', 'Authenticated as College Administrator.');
-        return;
-      }
-      const res = await loginWithSupabase(adminEmail.trim(), adminPass.trim());
-      if (res.success) {
-        showToast('success', 'Authenticated via Cloud Admin Account.');
-        return;
-      }
-    }
-
     if (adminPin.trim() && loginWithPin(adminPin)) {
+      setActivePage('admin');
       showToast('success', 'Authenticated as College Administrator.');
       return;
     }
 
     if (adminPass.trim() && loginWithPin(adminPass)) {
+      setActivePage('admin');
       showToast('success', 'Authenticated as College Administrator.');
       return;
     }
 
-    setAuthError('Invalid Admin credentials or PIN. Access restricted to authorized personnel.');
+    if (adminEmail.trim() && adminPass.trim()) {
+      if (loginWithAdminCredentials(adminEmail, adminPass)) {
+        setActivePage('admin');
+        showToast('success', 'Authenticated as College Administrator.');
+        return;
+      }
+      const res = await loginWithSupabase(adminEmail.trim(), adminPass.trim());
+      if (res.success) {
+        setActivePage('admin');
+        showToast('success', 'Authenticated via Cloud Admin Account.');
+        return;
+      }
+    }
+
+    setAuthError('Invalid Admin credentials or Master PIN. Access restricted to authorized personnel.');
   };
 
   const handleUserLogin = async (e: React.FormEvent) => {

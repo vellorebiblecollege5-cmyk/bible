@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { useCollege } from '../context/CollegeContext';
 import { COLLEGE_INFO, COLLEGE_JOURNEY } from '../data/collegeData';
 import {
@@ -20,13 +20,16 @@ import {
   Layers,
   Monitor,
   Building,
-  Check
+  Check,
+  Camera
 } from 'lucide-react';
 
-import heroBanner from '../assets/images/icbc_campus_building_1790394522586.jpg';
+import defaultHeroBanner from '../assets/images/icbc_exact_campus_building_1790396969836.jpg';
 import officialLogo from '../assets/images/icbc_official_logo_1790324060325.jpg';
 import graduationPhoto from '../assets/images/icbc_graduation_1790324006996.jpg';
 import classroomPhoto from '../assets/images/icbc_classroom_1790324037922.jpg';
+
+const CUSTOM_HERO_STORAGE_KEY = 'icbc_custom_campus_photo_v1';
 
 export const HomeView: React.FC = () => {
   const {
@@ -38,6 +41,32 @@ export const HomeView: React.FC = () => {
     setActiveDocumentPreview
   } = useCollege();
 
+  const [campusPhoto, setCampusPhoto] = useState<string>(() => {
+    try {
+      return localStorage.getItem(CUSTOM_HERO_STORAGE_KEY) || defaultHeroBanner;
+    } catch {
+      return defaultHeroBanner;
+    }
+  });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setCampusPhoto(reader.result);
+        try {
+          localStorage.setItem(CUSTOM_HERO_STORAGE_KEY, reader.result);
+        } catch {
+          // ignore storage quota errors
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleApplyCourse = (courseId: string) => {
     setSelectedCourseForApply(courseId);
     setActivePage('admissions-application');
@@ -46,29 +75,28 @@ export const HomeView: React.FC = () => {
   return (
     <div className="font-sans text-slate-800 bg-white">
       {/* 1. HERO SECTION - FEATURING CAMPUS BUILDING */}
-      <section className="relative overflow-hidden min-h-[580px] lg:min-h-[640px] flex items-center bg-slate-900">
-        {/* Background Image: Image of Christ Bible College Campus Building */}
+      <section className="relative overflow-hidden min-h-[580px] lg:min-h-[640px] flex items-center bg-[#faf8f5] border-b border-stone-200">
+        {/* Subtle blurred ambient background from the same photo */}
         <div className="absolute inset-0 z-0">
           <img
-            src={heroBanner}
+            src={campusPhoto}
             alt="Image of Christ Bible College Campus Building"
             referrerPolicy="no-referrer"
-            className="w-full h-full object-cover object-center"
+            className="w-full h-full object-cover object-center opacity-20 blur-sm scale-105"
           />
-          {/* Subtle directional gradient overlay for text legibility on the left while keeping the campus building visible */}
-          <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-white/85 to-white/15 lg:to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#faf8f5] via-[#faf8f5]/95 to-[#faf8f5]/75"></div>
         </div>
 
         {/* Content Container */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-            <div className="lg:col-span-6 space-y-6">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+            <div className="lg:col-span-5 space-y-6">
               {/* College Title */}
               <div>
                 <span className="text-xs uppercase tracking-widest text-amber-700 font-bold block mb-1">
                   Vellore, Tamil Nadu • Since 2020
                 </span>
-                <h1 className="font-cinzel text-3xl sm:text-5xl lg:text-6xl font-black text-[#0f2444] tracking-tight leading-[1.1]">
+                <h1 className="font-cinzel text-3xl sm:text-5xl font-black text-[#0f2444] tracking-tight leading-[1.1]">
                   Image of Christ <br />
                   <span className="text-[#132c54]">Bible College</span>
                 </h1>
@@ -98,7 +126,7 @@ export const HomeView: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-4 pt-3">
+              <div className="flex flex-wrap items-center gap-4 pt-2">
                 <button
                   onClick={() => setActivePage('admissions-application')}
                   className="px-7 py-3.5 rounded-full bg-[#d97706] hover:bg-[#b45309] text-white font-bold text-sm tracking-wide shadow-md hover:shadow-lg transition-all flex items-center group active:scale-95 cursor-pointer"
@@ -109,7 +137,7 @@ export const HomeView: React.FC = () => {
 
                 <button
                   onClick={() => setActivePage('courses')}
-                  className="px-6 py-3.5 rounded-full bg-white/90 hover:bg-white text-[#0f2444] font-bold text-sm border border-slate-300 hover:border-slate-400 shadow-sm transition-all flex items-center active:scale-95 cursor-pointer"
+                  className="px-6 py-3.5 rounded-full bg-white hover:bg-slate-50 text-[#0f2444] font-bold text-sm border border-slate-300 hover:border-slate-400 shadow-sm transition-all flex items-center active:scale-95 cursor-pointer"
                 >
                   <BookOpen className="w-4 h-4 mr-2 text-[#0f2444]" />
                   <span>Explore Courses</span>
@@ -117,15 +145,31 @@ export const HomeView: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Column: Clear Unobstructed Campus Building Photo Showcase */}
-            <div className="lg:col-span-6">
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white/95 bg-white group">
+            {/* Right Column: Full Uncropped 16:9 Campus Building Photo */}
+            <div className="lg:col-span-7">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white bg-slate-900 group">
                 <img
-                  src={heroBanner}
+                  src={campusPhoto}
                   alt="Image of Christ Bible College Building"
                   referrerPolicy="no-referrer"
-                  className="w-full h-[280px] sm:h-[360px] lg:h-[400px] object-cover object-center group-hover:scale-102 transition-transform duration-500"
+                  className="w-full aspect-video object-cover object-center"
                 />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Select exact photo file from your device"
+                  className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-slate-900/75 hover:bg-slate-900 text-white text-xs font-semibold backdrop-blur-sm border border-white/20 flex items-center space-x-1.5 opacity-85 hover:opacity-100 transition-all cursor-pointer shadow-md"
+                >
+                  <Camera className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Set Exact Photo</span>
+                </button>
                 <div className="bg-[#0f2444] text-white px-4 py-2.5 flex items-center justify-between text-xs">
                   <div className="flex items-center space-x-2">
                     <Building className="w-4 h-4 text-amber-400 flex-shrink-0" />
