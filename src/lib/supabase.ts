@@ -1,26 +1,66 @@
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { StorageBucket, UserRole, AppUser } from '../types';
 
-// Default Supabase project configuration keys provided by user:
-// Publishable key: sb_publishable_mY-zOAZTMoje3pwhNMw4gg_XD_AcXHr
-// Secret key: sb_secret_2K24FMByaTgTVBC9NSvF9Q_tiSKXK0s
+// Default Supabase project configuration provided by user:
+// Project Ref: qbxbfqjzpxiyzobyojex
+// Project URL: https://qbxbfqjzpxiyzobyojex.supabase.co
+// Publishable key: sb_publishable_tHwdETTQZKzPhsf1A-_uMQ_Iyx-kXXQ
+// Secret key: sb_secret_-sw5sCPbxRuYg1TFPSqWAQ_AJ2lOkCd
 
-export const DEFAULT_SUPABASE_KEY = 'sb_publishable_mY-zOAZTMoje3pwhNMw4gg_XD_AcXHr';
-export const DEFAULT_SUPABASE_SECRET = 'sb_secret_2K24FMByaTgTVBC9NSvF9Q_tiSKXK0s';
+export const DEFAULT_SUPABASE_URL = 'https://qbxbfqjzpxiyzobyojex.supabase.co';
+export const DEFAULT_SUPABASE_KEY = 'sb_publishable_tHwdETTQZKzPhsf1A-_uMQ_Iyx-kXXQ';
+export const DEFAULT_SUPABASE_SECRET = 'sb_secret_-sw5sCPbxRuYg1TFPSqWAQ_AJ2lOkCd';
+
+const LEGACY_KEYS = ['sb_publishable_mY-zOAZTMoje3pwhNMw4gg_XD_AcXHr'];
 
 const SUPABASE_STORAGE_URL_KEY = 'icbc_supabase_project_url';
 const SUPABASE_STORAGE_KEY_KEY = 'icbc_supabase_project_key';
+
+export function normalizeSupabaseUrl(raw: string): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return DEFAULT_SUPABASE_URL;
+
+  // If stored URL was localhost or a cloud run preview URL, use the real Supabase URL
+  if (trimmed.includes('localhost') || trimmed.includes('.run.app')) {
+    return DEFAULT_SUPABASE_URL;
+  }
+
+  // Extract project ref if user pasted postgresql://...@db.<ref>.supabase.co:5432/postgres or db.<ref>.supabase.co
+  const dbMatch = trimmed.match(/(?:db\.)?([a-z0-9]{15,25})\.supabase\.co/i);
+  if (dbMatch && dbMatch[1]) {
+    return `https://${dbMatch[1].toLowerCase()}.supabase.co`;
+  }
+
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    return `https://${trimmed}`;
+  }
+  return trimmed;
+}
 
 export function getSavedSupabaseConfig(): { url: string; key: string } {
   const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
   const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
-  const defaultOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-  const storedUrl = localStorage.getItem(SUPABASE_STORAGE_URL_KEY) || envUrl || defaultOrigin;
-  const storedKey = localStorage.getItem(SUPABASE_STORAGE_KEY_KEY) || envKey || DEFAULT_SUPABASE_KEY;
+  const rawStoredUrl = typeof window !== 'undefined' ? localStorage.getItem(SUPABASE_STORAGE_URL_KEY) : null;
+  const rawStoredKey = typeof window !== 'undefined' ? localStorage.getItem(SUPABASE_STORAGE_KEY_KEY) : null;
+
+  const storedUrl = rawStoredUrl || envUrl || DEFAULT_SUPABASE_URL;
+  let storedKey = rawStoredKey || envKey || DEFAULT_SUPABASE_KEY;
+
+  if (LEGACY_KEYS.includes(storedKey.trim())) {
+    storedKey = DEFAULT_SUPABASE_KEY;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(SUPABASE_STORAGE_KEY_KEY, DEFAULT_SUPABASE_KEY);
+    }
+  }
+
+  const finalUrl = normalizeSupabaseUrl(storedUrl);
+  if (typeof window !== 'undefined' && rawStoredUrl && rawStoredUrl !== finalUrl) {
+    localStorage.setItem(SUPABASE_STORAGE_URL_KEY, finalUrl);
+  }
 
   return {
-    url: storedUrl.trim(),
+    url: finalUrl,
     key: storedKey.trim()
   };
 }
@@ -30,7 +70,7 @@ export function isExternalSupabaseUrl(url: string): boolean {
 }
 
 export function saveSupabaseConfig(url: string, key: string) {
-  if (url) localStorage.setItem(SUPABASE_STORAGE_URL_KEY, url.trim());
+  if (url) localStorage.setItem(SUPABASE_STORAGE_URL_KEY, normalizeSupabaseUrl(url));
   if (key) localStorage.setItem(SUPABASE_STORAGE_KEY_KEY, key.trim());
 }
 
@@ -44,11 +84,7 @@ export function getSupabaseClient(): SupabaseClient | null {
     return null;
   }
 
-  // Ensure url is valid format (e.g. https://xyz.supabase.co)
-  let normalizedUrl = url;
-  if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
-    normalizedUrl = `https://${normalizedUrl}`;
-  }
+  const normalizedUrl = normalizeSupabaseUrl(url);
 
   try {
     if (cachedClient && lastUrl === normalizedUrl && lastKey === key) {

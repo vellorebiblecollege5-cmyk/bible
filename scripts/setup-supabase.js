@@ -3,8 +3,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.argv[2];
-const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_mY-zOAZTMoje3pwhNMw4gg_XD_AcXHr';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.argv[2] || 'https://qbxbfqjzpxiyzobyojex.supabase.co';
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_tHwdETTQZKzPhsf1A-_uMQ_Iyx-kXXQ';
 
 if (!SUPABASE_URL || !SUPABASE_URL.startsWith('http')) {
   console.log('⚠️ Please provide a valid Supabase Project URL:');
