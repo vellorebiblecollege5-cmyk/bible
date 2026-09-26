@@ -131,7 +131,7 @@ interface CollegeContextType {
   updateEvent: (id: string, updates: Partial<EventItem>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   gallery: GalleryPhoto[];
-  addGalleryPhoto: (photo: Omit<GalleryPhoto, 'id'>) => Promise<void>;
+  addGalleryPhoto: (photo: Omit<GalleryPhoto, 'id'>) => Promise<GalleryPhoto>;
   updateGalleryPhoto: (id: string, updates: Partial<GalleryPhoto>) => Promise<void>;
   deleteGalleryPhoto: (id: string) => Promise<void>;
   addCourse: (course: Course) => Promise<void>;
@@ -183,7 +183,24 @@ const STORAGE_KEYS = {
   GALLERY: 'icbc_gallery_v4_empty',
   UPLOADED_FILES: 'icbc_uploaded_files_v2',
   AUTH_USER: 'icbc_auth_user_v2',
-  STUDENT_AUTH: 'icbc_student_auth_v2'
+  STUDENT_AUTH: 'icbc_student_auth_v2',
+  DELETED_IDS: 'icbc_deleted_ids_v2'
+};
+
+const safeSetLocalStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    try {
+      // Free up space from secondary uploaded_files cache if localStorage quota is full
+      if (key !== STORAGE_KEYS.UPLOADED_FILES) {
+        localStorage.removeItem(STORAGE_KEYS.UPLOADED_FILES);
+        localStorage.setItem(key, value);
+      }
+    } catch {
+      // ignore quota error
+    }
+  }
 };
 
 export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -323,24 +340,66 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const clientSessionId = useRef(`tab-${Date.now()}-${Math.random().toString(36).slice(2)}`).current;
 
+  const deletedIdsRef = useRef<Set<string>>(
+    (() => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEYS.DELETED_IDS);
+        return saved ? new Set<string>(JSON.parse(saved)) : new Set<string>();
+      } catch {
+        return new Set<string>();
+      }
+    })()
+  );
+
+  const recordDeletedId = (id: string) => {
+    deletedIdsRef.current.add(id);
+    safeSetLocalStorage(STORAGE_KEYS.DELETED_IDS, JSON.stringify(Array.from(deletedIdsRef.current)));
+  };
+
+  // Always-fresh ref of all state arrays so SSE/Realtime callbacks never read stale closures
+  const liveStateRef = useRef({
+    courses,
+    faculty,
+    studentsList,
+    subjectsList,
+    applications,
+    notices,
+    events,
+    studyMaterials,
+    gallery,
+    downloads,
+    contactMessages,
+    uploadedFiles
+  });
+  liveStateRef.current = {
+    courses,
+    faculty,
+    studentsList,
+    subjectsList,
+    applications,
+    notices,
+    events,
+    studyMaterials,
+    gallery,
+    downloads,
+    contactMessages,
+    uploadedFiles
+  };
+
   // Helper to push updates to persistent Supabase server store & broadcast to all open website tabs
   const pushToSupabaseBackend = async (payload: Record<string, any[]>) => {
-    try {
-      if (Array.isArray(payload.courses)) localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(payload.courses));
-      if (Array.isArray(payload.faculty)) localStorage.setItem(STORAGE_KEYS.FACULTY, JSON.stringify(payload.faculty));
-      if (Array.isArray(payload.students)) localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(payload.students));
-      if (Array.isArray(payload.subjects)) localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(payload.subjects));
-      if (Array.isArray(payload.admissions)) localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(payload.admissions));
-      if (Array.isArray(payload.notices)) localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(payload.notices));
-      if (Array.isArray(payload.events)) localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(payload.events));
-      if (Array.isArray(payload.study_materials)) localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(payload.study_materials));
-      if (Array.isArray(payload.gallery)) localStorage.setItem(STORAGE_KEYS.GALLERY, JSON.stringify(payload.gallery));
-      if (Array.isArray(payload.downloads)) localStorage.setItem(STORAGE_KEYS.DOWNLOADS, JSON.stringify(payload.downloads));
-      if (Array.isArray(payload.contact_messages)) localStorage.setItem(STORAGE_KEYS.CONTACT, JSON.stringify(payload.contact_messages));
-      if (Array.isArray(payload.uploaded_files)) localStorage.setItem(STORAGE_KEYS.UPLOADED_FILES, JSON.stringify(payload.uploaded_files));
-    } catch {
-      // ignore localStorage quota errors
-    }
+    if (Array.isArray(payload.courses)) safeSetLocalStorage(STORAGE_KEYS.COURSES, JSON.stringify(payload.courses));
+    if (Array.isArray(payload.faculty)) safeSetLocalStorage(STORAGE_KEYS.FACULTY, JSON.stringify(payload.faculty));
+    if (Array.isArray(payload.students)) safeSetLocalStorage(STORAGE_KEYS.STUDENTS, JSON.stringify(payload.students));
+    if (Array.isArray(payload.subjects)) safeSetLocalStorage(STORAGE_KEYS.SUBJECTS, JSON.stringify(payload.subjects));
+    if (Array.isArray(payload.admissions)) safeSetLocalStorage(STORAGE_KEYS.APPLICATIONS, JSON.stringify(payload.admissions));
+    if (Array.isArray(payload.notices)) safeSetLocalStorage(STORAGE_KEYS.NOTICES, JSON.stringify(payload.notices));
+    if (Array.isArray(payload.events)) safeSetLocalStorage(STORAGE_KEYS.EVENTS, JSON.stringify(payload.events));
+    if (Array.isArray(payload.study_materials)) safeSetLocalStorage(STORAGE_KEYS.MATERIALS, JSON.stringify(payload.study_materials));
+    if (Array.isArray(payload.gallery)) safeSetLocalStorage(STORAGE_KEYS.GALLERY, JSON.stringify(payload.gallery));
+    if (Array.isArray(payload.downloads)) safeSetLocalStorage(STORAGE_KEYS.DOWNLOADS, JSON.stringify(payload.downloads));
+    if (Array.isArray(payload.contact_messages)) safeSetLocalStorage(STORAGE_KEYS.CONTACT, JSON.stringify(payload.contact_messages));
+    if (Array.isArray(payload.uploaded_files)) safeSetLocalStorage(STORAGE_KEYS.UPLOADED_FILES, JSON.stringify(payload.uploaded_files));
 
     try {
       if (typeof BroadcastChannel !== 'undefined') {
@@ -400,72 +459,72 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Sync to local storage for instant offline resilience
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.NOTICES, JSON.stringify(notices));
+    safeSetLocalStorage(STORAGE_KEYS.NOTICES, JSON.stringify(notices));
   }, [notices]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(studyMaterials));
+    safeSetLocalStorage(STORAGE_KEYS.MATERIALS, JSON.stringify(studyMaterials));
   }, [studyMaterials]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(events));
+    safeSetLocalStorage(STORAGE_KEYS.EVENTS, JSON.stringify(events));
   }, [events]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(applications));
+    safeSetLocalStorage(STORAGE_KEYS.APPLICATIONS, JSON.stringify(applications));
   }, [applications]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CONTACT, JSON.stringify(contactMessages));
+    safeSetLocalStorage(STORAGE_KEYS.CONTACT, JSON.stringify(contactMessages));
   }, [contactMessages]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(studentsList));
+    safeSetLocalStorage(STORAGE_KEYS.STUDENTS, JSON.stringify(studentsList));
     if (studentProfile) {
       const updatedSelf = studentsList.find(
         s => s.id === studentProfile.id || s.regNo.toLowerCase() === studentProfile.regNo.toLowerCase()
       );
       if (updatedSelf && JSON.stringify(updatedSelf) !== JSON.stringify(studentProfile)) {
         setStudentProfile(updatedSelf);
-        localStorage.setItem('icbc_student_profile', JSON.stringify(updatedSelf));
+        safeSetLocalStorage('icbc_student_profile', JSON.stringify(updatedSelf));
       }
     }
   }, [studentsList]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(subjectsList));
+    safeSetLocalStorage(STORAGE_KEYS.SUBJECTS, JSON.stringify(subjectsList));
   }, [subjectsList]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(courses));
+    safeSetLocalStorage(STORAGE_KEYS.COURSES, JSON.stringify(courses));
   }, [courses]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.FACULTY, JSON.stringify(faculty));
+    safeSetLocalStorage(STORAGE_KEYS.FACULTY, JSON.stringify(faculty));
   }, [faculty]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.DOWNLOADS, JSON.stringify(downloads));
+    safeSetLocalStorage(STORAGE_KEYS.DOWNLOADS, JSON.stringify(downloads));
   }, [downloads]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.GALLERY, JSON.stringify(gallery));
+    safeSetLocalStorage(STORAGE_KEYS.GALLERY, JSON.stringify(gallery));
   }, [gallery]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.UPLOADED_FILES, JSON.stringify(uploadedFiles));
+    safeSetLocalStorage(STORAGE_KEYS.UPLOADED_FILES, JSON.stringify(uploadedFiles));
   }, [uploadedFiles]);
 
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(currentUser));
+      safeSetLocalStorage(STORAGE_KEYS.AUTH_USER, JSON.stringify(currentUser));
     } else {
       localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
     }
   }, [currentUser]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.STUDENT_AUTH, JSON.stringify(isStudentLoggedIn));
+    safeSetLocalStorage(STORAGE_KEYS.STUDENT_AUTH, JSON.stringify(isStudentLoggedIn));
   }, [isStudentLoggedIn]);
 
   // Listen to Supabase Auth State changes on mount if connected to external Supabase
@@ -678,7 +737,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const img = new window.Image();
           img.onload = () => {
             try {
-              const maxDim = 1280;
+              const maxDim = 960;
               let w = img.width;
               let h = img.height;
               if (w > maxDim || h > maxDim) {
@@ -696,7 +755,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
               const ctx = canvas.getContext('2d');
               if (ctx) {
                 ctx.drawImage(img, 0, 0, w, h);
-                resolve(canvas.toDataURL('image/jpeg', 0.82));
+                resolve(canvas.toDataURL('image/jpeg', 0.78));
                 return;
               }
             } catch {
@@ -822,6 +881,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteFaculty = async (id: string) => {
+    recordDeletedId(id);
     setFaculty(prev => {
       const next = prev.filter(f => f.id !== id);
       pushToSupabaseBackend({ faculty: next });
@@ -847,7 +907,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const client = getSupabaseClient();
     if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
-        await client.from('students').insert({
+        const payload = {
           id: student.id,
           student_id: student.regNo,
           full_name: student.name,
@@ -861,7 +921,11 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
           attendance_percent: student.attendancePercent,
           gpa: student.gpa,
           status: 'Active'
-        });
+        };
+        const { error } = await client.from('students').upsert(payload);
+        if (error) {
+          await client.from('students').upsert({ ...payload, course_id: null });
+        }
       } catch (e) {
         console.warn('Failed to insert student into Supabase:', e);
       }
@@ -897,6 +961,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteStudent = async (id: string) => {
+    recordDeletedId(id);
     setStudentsList(prev => {
       const next = prev.filter(s => s.id !== id);
       pushToSupabaseBackend({ students: next });
@@ -921,7 +986,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const client = getSupabaseClient();
     if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
-        await client.from('subjects').insert({
+        const payload = {
           id: subject.id,
           course_id: subject.courseId,
           subject_code: subject.subjectCode,
@@ -929,7 +994,11 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
           credits: subject.credits,
           semester_or_year: subject.semesterOrYear,
           faculty_name: subject.facultyName
-        });
+        };
+        const { error } = await client.from('subjects').upsert(payload);
+        if (error) {
+          await client.from('subjects').upsert({ ...payload, course_id: null });
+        }
       } catch (e) {
         console.warn('Failed to insert subject into Supabase:', e);
       }
@@ -960,6 +1029,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteSubject = async (id: string) => {
+    recordDeletedId(id);
     setSubjectsList(prev => {
       const next = prev.filter(s => s.id !== id);
       pushToSupabaseBackend({ subjects: next });
@@ -975,62 +1045,70 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Merge helper: preserves user-added localStorage items if server store doesn't have them yet
+  // Merge helper: always uses liveStateRef.current (never stale closures!) and preserves local uploads/items
+  const mergeByIdHelper = <T extends { id: string }>(
+    localArr: T[],
+    remoteArr: T[] | undefined
+  ): { merged: T[]; extraLocal: T[]; localHasExtra: boolean } => {
+    const cleanLocal = localArr.filter(item => item && item.id && !deletedIdsRef.current.has(item.id));
+    if (!Array.isArray(remoteArr)) {
+      return { merged: cleanLocal, extraLocal: [], localHasExtra: false };
+    }
+    const cleanRemote = remoteArr.filter(item => item && item.id && !deletedIdsRef.current.has(item.id));
+    const remoteIds = new Set(cleanRemote.map(item => item.id));
+    const extraLocal = cleanLocal.filter(item => !remoteIds.has(item.id));
+    if (extraLocal.length > 0) {
+      return { merged: [...extraLocal, ...cleanRemote], extraLocal, localHasExtra: true };
+    }
+    return { merged: cleanRemote, extraLocal: [], localHasExtra: false };
+  };
+
   const mergeAndSyncInitialState = (serverState: any) => {
     if (!serverState || typeof serverState !== 'object') return;
-    const mergeById = <T extends { id: string }>(localArr: T[], remoteArr: T[] | undefined): { merged: T[]; localHasExtra: boolean } => {
-      if (!Array.isArray(remoteArr)) return { merged: localArr, localHasExtra: false };
-      const remoteIds = new Set(remoteArr.map(item => item.id));
-      const extraLocal = localArr.filter(item => item && item.id && !remoteIds.has(item.id));
-      if (extraLocal.length > 0) {
-        return { merged: [...extraLocal, ...remoteArr], localHasExtra: true };
-      }
-      return { merged: remoteArr, localHasExtra: false };
-    };
-
+    const live = liveStateRef.current;
     const toPush: Record<string, any[]> = {};
 
-    const crs = mergeById(courses, serverState.courses);
+    const crs = mergeByIdHelper(live.courses, serverState.courses);
     setCourses(crs.merged);
     if (crs.localHasExtra) toPush.courses = crs.merged;
 
-    const fac = mergeById(faculty, serverState.faculty);
+    const fac = mergeByIdHelper(live.faculty, serverState.faculty);
     setFaculty(fac.merged);
     if (fac.localHasExtra) toPush.faculty = fac.merged;
 
-    const std = mergeById(studentsList, serverState.students);
+    const std = mergeByIdHelper(live.studentsList, serverState.students);
     setStudentsList(std.merged);
     if (std.localHasExtra) toPush.students = std.merged;
 
-    const sub = mergeById(subjectsList, serverState.subjects);
+    const sub = mergeByIdHelper(live.subjectsList, serverState.subjects);
     setSubjectsList(sub.merged);
     if (sub.localHasExtra) toPush.subjects = sub.merged;
 
-    const adm = mergeById(applications, serverState.admissions);
+    const adm = mergeByIdHelper(live.applications, serverState.admissions);
     setApplications(adm.merged);
     if (adm.localHasExtra) toPush.admissions = adm.merged;
 
-    const not = mergeById(notices, serverState.notices);
+    const not = mergeByIdHelper(live.notices, serverState.notices);
     setNotices(not.merged);
     if (not.localHasExtra) toPush.notices = not.merged;
 
-    const ev = mergeById(events, serverState.events);
+    const ev = mergeByIdHelper(live.events, serverState.events);
     setEvents(ev.merged);
     if (ev.localHasExtra) toPush.events = ev.merged;
 
-    const mat = mergeById(studyMaterials, serverState.study_materials);
+    const mat = mergeByIdHelper(live.studyMaterials, serverState.study_materials);
     setStudyMaterials(mat.merged);
     if (mat.localHasExtra) toPush.study_materials = mat.merged;
 
-    const gal = mergeById(gallery, serverState.gallery);
+    const gal = mergeByIdHelper(live.gallery, serverState.gallery);
     setGallery(gal.merged);
     if (gal.localHasExtra) toPush.gallery = gal.merged;
 
-    const dl = mergeById(downloads, serverState.downloads);
+    const dl = mergeByIdHelper(live.downloads, serverState.downloads);
     setDownloads(dl.merged);
     if (dl.localHasExtra) toPush.downloads = dl.merged;
 
-    const msg = mergeById(contactMessages, serverState.contact_messages);
+    const msg = mergeByIdHelper(live.contactMessages, serverState.contact_messages);
     setContactMessages(msg.merged);
     if (msg.localHasExtra) toPush.contact_messages = msg.merged;
 
@@ -1078,67 +1156,118 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
-      // 1. Fetch admissions
-      const { data: appData, error: appError } = await client.from('admissions').select('*').limit(50);
-      if (!appError && appData) {
-        const formatted = appData.map(a => ({
-          id: a.id,
-          applicationNo: a.application_no || a.id,
-          fullName: a.full_name,
-          email: a.email,
-          phone: a.phone,
-          dateOfBirth: a.date_of_birth || '',
-          gender: a.gender || 'Male',
-          courseId: a.course_id || 'bth',
-          previousEducation: a.previous_education || '',
-          homeChurch: a.home_church || '',
-          pastorName: a.pastor_name || '',
-          pastorPhone: a.pastor_phone || '',
-          personalTestimony: a.personal_testimony || '',
-          ministryCalling: a.ministry_calling || '',
-          submittedAt: a.applied_at ? new Date(a.applied_at).toLocaleString() : new Date().toLocaleString(),
-          status: a.status || 'Under Review',
-          notes: a.notes
+      const live = liveStateRef.current;
+
+      // 1. Fetch & merge courses first so foreign keys exist
+      const { data: crsData, error: crsErr } = await client.from('courses').select('*');
+      if (!crsErr && crsData) {
+        const remoteCourses: Course[] = crsData.map(c => {
+          const fallbackCourse = INITIAL_COURSES.find(initC => initC.id === c.id || initC.code === c.course_code);
+          return {
+            id: c.id,
+            code: c.course_code || c.id.toUpperCase(),
+            title: c.course_name || c.title || '',
+            level: (c.level as Course['level']) || 'Bachelor',
+            duration: c.duration || '3 Years',
+            mode: (c.mode as Course['mode']) || 'Residential',
+            language: c.language || 'English & Tamil',
+            description: c.description || '',
+            eligibility: c.eligibility || '',
+            totalCredits: c.total_credits || 96,
+            annualTuition: c.annual_tuition || '',
+            curriculum: c.curriculum && Array.isArray(c.curriculum) ? c.curriculum : fallbackCourse?.curriculum || [],
+            outcomes: c.outcomes && Array.isArray(c.outcomes) ? c.outcomes : fallbackCourse?.outcomes || []
+          };
+        });
+        const mergedCrs = mergeByIdHelper(live.courses, remoteCourses);
+        if (mergedCrs.merged.length > 0) setCourses(mergedCrs.merged);
+        if (mergedCrs.extraLocal.length > 0) {
+          await client.from('courses').upsert(
+            mergedCrs.extraLocal.map(c => ({
+              id: c.id,
+              course_code: c.code,
+              course_name: c.title,
+              level: c.level,
+              duration: c.duration,
+              mode: c.mode,
+              language: c.language,
+              description: c.description,
+              eligibility: c.eligibility,
+              total_credits: c.totalCredits,
+              annual_tuition: c.annualTuition,
+              status: 'Active'
+            }))
+          );
+        }
+      }
+
+      // 2. Fetch & merge gallery (never wipe local uploads if remote is empty!)
+      const { data: galData, error: galErr } = await client.from('gallery').select('*');
+      if (!galErr && galData) {
+        const remoteGal: GalleryPhoto[] = galData.map(g => ({
+          id: g.id,
+          title: g.title,
+          category: (g.category as GalleryPhoto['category']) || 'Campus',
+          image: g.image_url || g.image || '',
+          caption: g.caption || ''
         }));
-        setApplications(formatted as ApplicationSubmission[]);
+        const mergedGal = mergeByIdHelper(live.gallery, remoteGal);
+        setGallery(mergedGal.merged);
+        if (mergedGal.extraLocal.length > 0) {
+          await client.from('gallery').upsert(
+            mergedGal.extraLocal.map(g => ({
+              id: g.id,
+              title: g.title,
+              category: g.category,
+              image_url: g.image,
+              caption: g.caption
+            }))
+          );
+        }
       }
 
-      // 2. Fetch notices
-      const { data: noticeData, error: noticeErr } = await client.from('notices').select('*').order('created_at', { ascending: false });
-      if (!noticeErr && noticeData && noticeData.length > 0) {
-        setNotices(noticeData.map(n => ({
-          id: n.id,
-          title: n.title,
-          category: n.category as Notice['category'],
-          isUrgent: n.is_urgent,
-          content: n.content,
-          postedBy: n.posted_by,
-          date: n.created_at ? new Date(n.created_at).toISOString().split('T')[0] : '2026-09-24'
-        })));
+      // 3. Fetch & merge faculty
+      const { data: facData, error: facErr } = await client.from('faculty').select('*');
+      if (!facErr && facData) {
+        const remoteFac: FacultyMember[] = facData.map(f => ({
+          id: f.id,
+          name: f.name,
+          role: f.designation || 'Faculty',
+          department: f.department || 'Theology',
+          degrees: f.qualification || '',
+          almaMater: f.alma_mater || '',
+          yearsOfExperience: Number(f.years_of_experience) || 5,
+          bio: f.bio || '',
+          subjects: Array.isArray(f.subjects) ? f.subjects : [],
+          photo: f.profile_image || '',
+          quote: f.quote || ''
+        }));
+        const mergedFac = mergeByIdHelper(live.faculty, remoteFac);
+        if (mergedFac.merged.length > 0) setFaculty(mergedFac.merged);
+        if (mergedFac.extraLocal.length > 0) {
+          await client.from('faculty').upsert(
+            mergedFac.extraLocal.map(f => ({
+              id: f.id,
+              name: f.name,
+              designation: f.role,
+              department: f.department,
+              qualification: f.degrees,
+              alma_mater: f.almaMater,
+              years_of_experience: f.yearsOfExperience,
+              bio: f.bio,
+              subjects: f.subjects,
+              profile_image: f.photo,
+              quote: f.quote || '',
+              status: 'Active'
+            }))
+          );
+        }
       }
 
-      // 3. Fetch study materials
-      const { data: matData, error: matErr } = await client.from('study_materials').select('*');
-      if (!matErr && matData && matData.length > 0) {
-        setStudyMaterials(matData.map(m => ({
-          id: m.id,
-          title: m.title,
-          courseCode: m.course_id || 'General',
-          courseName: m.course_name || 'Theology',
-          subject: m.subject || 'Biblical Studies',
-          facultyName: m.faculty_name || 'Faculty',
-          type: (m.type as StudyMaterial['type']) || 'PDF',
-          fileSize: m.file_size || '3.5 MB',
-          uploadedDate: m.created_at ? new Date(m.created_at).toISOString().split('T')[0] : '2026-09-24',
-          description: m.description || '',
-          downloadUrl: m.file_url
-        })));
-      }
-
-      // 4. Fetch students
+      // 4. Fetch & merge students
       const { data: stdData, error: stdErr } = await client.from('students').select('*');
-      if (!stdErr && stdData && stdData.length > 0) {
-        setStudentsList(stdData.map(s => ({
+      if (!stdErr && stdData) {
+        const remoteStd: StudentProfile[] = stdData.map(s => ({
           id: s.id,
           regNo: s.student_id,
           name: s.full_name,
@@ -1153,13 +1282,91 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
           gpa: s.gpa || '3.8',
           enrolledSubjects: INITIAL_STUDENT_PROFILE.enrolledSubjects,
           recentAssignments: INITIAL_STUDENT_PROFILE.recentAssignments
-        })));
+        }));
+        const mergedStd = mergeByIdHelper(live.studentsList, remoteStd);
+        if (mergedStd.merged.length > 0) setStudentsList(mergedStd.merged);
+        if (mergedStd.extraLocal.length > 0) {
+          await client.from('students').upsert(
+            mergedStd.extraLocal.map(s => ({
+              id: s.id,
+              student_id: s.regNo,
+              full_name: s.name,
+              email: s.email,
+              phone: s.phone,
+              course_id: s.courseId,
+              course_title: s.courseTitle,
+              admission_year: s.currentYear,
+              batch: s.batch,
+              profile_image: s.avatar,
+              attendance_percent: s.attendancePercent,
+              gpa: s.gpa,
+              status: 'Active'
+            }))
+          );
+        }
       }
 
-      // 5. Fetch events
+      // 5. Fetch & merge subjects
+      const { data: subData, error: subErr } = await client.from('subjects').select('*');
+      if (!subErr && subData) {
+        const remoteSub: SubjectItem[] = subData.map(s => ({
+          id: s.id,
+          courseId: s.course_id || 'bth',
+          subjectCode: s.subject_code || '',
+          subjectName: s.subject_name || '',
+          credits: Number(s.credits) || 3,
+          semesterOrYear: s.semester_or_year || 'Year 1',
+          facultyName: s.faculty_name || 'Pr. Christopher'
+        }));
+        const mergedSub = mergeByIdHelper(live.subjectsList, remoteSub);
+        if (mergedSub.merged.length > 0) setSubjectsList(mergedSub.merged);
+        if (mergedSub.extraLocal.length > 0) {
+          await client.from('subjects').upsert(
+            mergedSub.extraLocal.map(sub => ({
+              id: sub.id,
+              course_id: sub.courseId,
+              subject_code: sub.subjectCode,
+              subject_name: sub.subjectName,
+              credits: sub.credits,
+              semester_or_year: sub.semesterOrYear,
+              faculty_name: sub.facultyName
+            }))
+          );
+        }
+      }
+
+      // 6. Fetch & merge notices
+      const { data: noticeData, error: noticeErr } = await client.from('notices').select('*').order('created_at', { ascending: false });
+      if (!noticeErr && noticeData) {
+        const remoteNot: Notice[] = noticeData.map(n => ({
+          id: n.id,
+          title: n.title,
+          category: n.category as Notice['category'],
+          isUrgent: n.is_urgent,
+          content: n.content,
+          postedBy: n.posted_by,
+          date: n.created_at ? new Date(n.created_at).toISOString().split('T')[0] : '2026-09-24'
+        }));
+        const mergedNot = mergeByIdHelper(live.notices, remoteNot);
+        if (mergedNot.merged.length > 0) setNotices(mergedNot.merged);
+        if (mergedNot.extraLocal.length > 0) {
+          await client.from('notices').upsert(
+            mergedNot.extraLocal.map(n => ({
+              id: n.id,
+              title: n.title,
+              category: n.category,
+              is_urgent: Boolean(n.isUrgent),
+              content: n.content,
+              posted_by: n.postedBy
+            }))
+          );
+        }
+      }
+
+      // 7. Fetch & merge events
       const { data: evData, error: evErr } = await client.from('events').select('*');
-      if (!evErr && evData && evData.length > 0) {
-        setEvents(evData.map(e => ({
+      if (!evErr && evData) {
+        const remoteEv: EventItem[] = evData.map(e => ({
           id: e.id,
           title: e.title,
           date: e.date,
@@ -1170,74 +1377,109 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
           description: e.description || '',
           image: e.image_url || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80',
           registrationOpen: Boolean(e.registration_open)
-        })));
-      }
-
-      // 6. Fetch gallery
-      const { data: galData, error: galErr } = await client.from('gallery').select('*');
-      if (!galErr && galData) {
-        setGallery(galData.map(g => ({
-          id: g.id,
-          title: g.title,
-          category: (g.category as GalleryPhoto['category']) || 'Campus',
-          image: g.image_url,
-          caption: g.caption || ''
-        })));
-      }
-
-      // 7. Fetch courses
-      const { data: crsData, error: crsErr } = await client.from('courses').select('*');
-      if (!crsErr && crsData && crsData.length > 0) {
-        setCourses(crsData.map(c => {
-          const fallbackCourse = INITIAL_COURSES.find(initC => initC.id === c.id || initC.code === c.course_code);
-          return {
-            id: c.id,
-            code: c.course_code || c.id.toUpperCase(),
-            title: c.course_name || c.title || '',
-            level: (c.level as Course['level']) || 'Bachelor',
-            duration: c.duration || '3 Years',
-            mode: (c.mode as Course['mode']) || 'Residential',
-            language: c.language || 'English & Tamil',
-            description: c.description || '',
-            eligibility: c.eligibility || '',
-            totalCredits: c.total_credits || 96,
-            annualTuition: c.annual_tuition || '',
-            curriculum: (c.curriculum && Array.isArray(c.curriculum)) ? c.curriculum : (fallbackCourse?.curriculum || []),
-            outcomes: (c.outcomes && Array.isArray(c.outcomes)) ? c.outcomes : (fallbackCourse?.outcomes || [])
-          };
         }));
+        const mergedEv = mergeByIdHelper(live.events, remoteEv);
+        if (mergedEv.merged.length > 0) setEvents(mergedEv.merged);
+        if (mergedEv.extraLocal.length > 0) {
+          await client.from('events').upsert(
+            mergedEv.extraLocal.map(e => ({
+              id: e.id,
+              title: e.title,
+              date: e.date,
+              time: e.time,
+              location: e.location,
+              speaker: e.speaker,
+              category: e.category,
+              description: e.description,
+              image_url: e.image,
+              registration_open: e.registrationOpen
+            }))
+          );
+        }
       }
 
-      // 8. Fetch faculty
-      const { data: facData, error: facErr } = await client.from('faculty').select('*');
-      if (!facErr && facData && facData.length > 0) {
-        setFaculty(facData.map(f => ({
-          id: f.id,
-          name: f.name,
-          role: f.designation || 'Faculty',
-          department: f.department || 'Theology',
-          degrees: f.qualification || '',
-          almaMater: f.alma_mater || '',
-          yearsOfExperience: Number(f.years_of_experience) || 5,
-          bio: f.bio || '',
-          subjects: Array.isArray(f.subjects) ? f.subjects : [],
-          photo: f.profile_image || '',
-          quote: f.quote || ''
-        })));
+      // 8. Fetch & merge study materials
+      const { data: matData, error: matErr } = await client.from('study_materials').select('*');
+      if (!matErr && matData) {
+        const remoteMat: StudyMaterial[] = matData.map(m => ({
+          id: m.id,
+          title: m.title,
+          courseCode: m.course_id || 'General',
+          courseName: m.course_name || 'Theology',
+          subject: m.subject || 'Biblical Studies',
+          facultyName: m.faculty_name || 'Faculty',
+          type: (m.type as StudyMaterial['type']) || 'PDF',
+          fileSize: m.file_size || '3.5 MB',
+          uploadedDate: m.created_at ? new Date(m.created_at).toISOString().split('T')[0] : '2026-09-24',
+          description: m.description || '',
+          downloadUrl: m.file_url
+        }));
+        const mergedMat = mergeByIdHelper(live.studyMaterials, remoteMat);
+        if (mergedMat.merged.length > 0) setStudyMaterials(mergedMat.merged);
+        if (mergedMat.extraLocal.length > 0) {
+          await client.from('study_materials').upsert(
+            mergedMat.extraLocal.map(m => ({
+              id: m.id,
+              title: m.title,
+              course_id: m.courseCode.includes('M.Div') ? 'mdiv' : 'bth',
+              course_name: m.courseName,
+              subject: m.subject,
+              faculty_name: m.facultyName,
+              type: m.type,
+              file_size: m.fileSize,
+              file_url: m.downloadUrl,
+              description: m.description,
+              uploaded_by: m.facultyName
+            }))
+          );
+        }
       }
 
-      // 9. Fetch subjects
-      const { data: subData, error: subErr } = await client.from('subjects').select('*');
-      if (!subErr && subData && subData.length > 0) {
-        setSubjectsList(subData.map(s => ({
-          id: s.id,
-          courseId: s.course_id || 'bth',
-          subjectCode: s.subject_code || '',
-          subjectName: s.subject_name || '',
-          credits: Number(s.credits) || 3,
-          semesterOrYear: s.semester_or_year || 'Year 1',
-          facultyName: s.faculty_name || 'Pr. Christopher'
-        })));
+      // 9. Fetch & merge admissions
+      const { data: appData, error: appError } = await client.from('admissions').select('*').limit(50);
+      if (!appError && appData) {
+        const remoteApps: ApplicationSubmission[] = appData.map(a => ({
+          id: a.id,
+          applicationNo: a.application_no || a.id,
+          fullName: a.full_name,
+          email: a.email,
+          phone: a.phone,
+          dateOfBirth: a.date_of_birth || '',
+          gender: (a.gender as ApplicationSubmission['gender']) || 'Male',
+          courseId: a.course_id || 'bth',
+          previousEducation: a.previous_education || '',
+          homeChurch: a.home_church || '',
+          pastorName: a.pastor_name || '',
+          pastorPhone: a.pastor_phone || '',
+          personalTestimony: a.personal_testimony || '',
+          ministryCalling: a.ministry_calling || '',
+          submittedAt: a.applied_at ? new Date(a.applied_at).toLocaleString() : new Date().toLocaleString(),
+          status: (a.status as ApplicationSubmission['status']) || 'Under Review',
+          notes: a.notes
+        }));
+        const mergedApps = mergeByIdHelper(live.applications, remoteApps);
+        setApplications(mergedApps.merged);
+        if (mergedApps.extraLocal.length > 0) {
+          await client.from('admissions').upsert(
+            mergedApps.extraLocal.map(a => ({
+              id: a.id,
+              application_no: a.applicationNo,
+              full_name: a.fullName,
+              email: a.email,
+              phone: a.phone,
+              date_of_birth: a.dateOfBirth,
+              gender: a.gender,
+              course_id: a.courseId,
+              previous_education: a.previousEducation,
+              home_church: a.homeChurch,
+              pastor_name: a.pastorName,
+              pastor_phone: a.pastorPhone,
+              personal_testimony: a.personalTestimony,
+              ministry_calling: a.ministryCalling,
+              status: a.status
+            }))
+          );
+        }
       }
 
       setSupabaseStatus(prev => ({
@@ -1597,6 +1839,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteStudyMaterial = async (id: string) => {
+    recordDeletedId(id);
     setStudyMaterials(prev => {
       const next = prev.filter(m => m.id !== id);
       pushToSupabaseBackend({ study_materials: next });
@@ -1631,7 +1874,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const client = getSupabaseClient();
     if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
-        await client.from('notices').insert({
+        await client.from('notices').upsert({
           id,
           title: newNotice.title,
           category: newNotice.category,
@@ -1668,6 +1911,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteNotice = async (id: string) => {
+    recordDeletedId(id);
     setNotices(prev => {
       const next = prev.filter(n => n.id !== id);
       pushToSupabaseBackend({ notices: next });
@@ -1696,7 +1940,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const client = getSupabaseClient();
     if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
-        await client.from('events').insert({
+        await client.from('events').upsert({
           id,
           title: newEvent.title,
           date: newEvent.date,
@@ -1741,6 +1985,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteEvent = async (id: string) => {
+    recordDeletedId(id);
     setEvents(prev => {
       const next = prev.filter(ev => ev.id !== id);
       pushToSupabaseBackend({ events: next });
@@ -1757,7 +2002,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Gallery Management (Immediately saved to Supabase & Live in User Site)
-  const addGalleryPhoto = async (photo: Omit<GalleryPhoto, 'id'>) => {
+  const addGalleryPhoto = async (photo: Omit<GalleryPhoto, 'id'>): Promise<GalleryPhoto> => {
     const id = `gal-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const newPhoto: GalleryPhoto = { ...photo, id };
     setGallery(prev => {
@@ -1769,7 +2014,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const client = getSupabaseClient();
     if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
-        await client.from('gallery').insert({
+        await client.from('gallery').upsert({
           id,
           title: newPhoto.title,
           category: newPhoto.category,
@@ -1780,6 +2025,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.warn('Could not save gallery photo to Supabase:', err);
       }
     }
+    return newPhoto;
   };
 
   const updateGalleryPhoto = async (id: string, updates: Partial<GalleryPhoto>) => {
@@ -1804,6 +2050,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteGalleryPhoto = async (id: string) => {
+    recordDeletedId(id);
     setGallery(prev => {
       const next = prev.filter(g => g.id !== id);
       pushToSupabaseBackend({ gallery: next });
@@ -1877,6 +2124,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteCourse = async (id: string) => {
+    recordDeletedId(id);
     setCourses(prev => {
       const next = prev.filter(c => c.id !== id);
       pushToSupabaseBackend({ courses: next });
@@ -1919,6 +2167,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteDownload = async (id: string) => {
+    recordDeletedId(id);
     setDownloads(prev => {
       const next = prev.filter(d => d.id !== id);
       pushToSupabaseBackend({ downloads: next });
@@ -2048,6 +2297,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteApplication = async (id: string) => {
+    recordDeletedId(id);
     setApplications(prev => {
       const next = prev.filter(a => a.id !== id);
       pushToSupabaseBackend({ admissions: next });
@@ -2107,6 +2357,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteContactMessage = async (id: string) => {
+    recordDeletedId(id);
     setContactMessages(prev => {
       const next = prev.filter(m => m.id !== id);
       pushToSupabaseBackend({ contact_messages: next });

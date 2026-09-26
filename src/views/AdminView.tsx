@@ -314,6 +314,7 @@ export const AdminView: React.FC = () => {
 
   // Gallery form (Add & Edit)
   const [editingGalleryId, setEditingGalleryId] = useState<string | null>(null);
+  const [autoCreatedGalleryId, setAutoCreatedGalleryId] = useState<string | null>(null);
   const [galTitle, setGalTitle] = useState('');
   const [galCategory, setGalCategory] = useState<GalleryPhoto['category']>('Campus');
   const [galImage, setGalImage] = useState('');
@@ -576,30 +577,32 @@ export const AdminView: React.FC = () => {
     setEventImage(ev.image);
   };
 
-  const handleSaveGallery = (e: React.FormEvent) => {
+  const handleSaveGallery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!galImage) {
       showToast('error', 'Please upload a picture or provide an image URL.');
       return;
     }
     const finalTitle = galTitle.trim() || 'Campus Gallery Photo';
-    if (editingGalleryId) {
-      updateGalleryPhoto(editingGalleryId, {
+    const targetId = editingGalleryId || autoCreatedGalleryId;
+    if (targetId) {
+      await updateGalleryPhoto(targetId, {
         title: finalTitle,
         category: galCategory,
         image: galImage,
         caption: galCaption || `${finalTitle} — Image of Christ Bible College, Vellore.`
       });
       setEditingGalleryId(null);
-      showToast('success', 'Gallery photo updated on website gallery page.');
+      setAutoCreatedGalleryId(null);
+      showToast('success', 'Gallery photo saved to Supabase & updated on live Website Gallery!');
     } else {
-      addGalleryPhoto({
+      await addGalleryPhoto({
         title: finalTitle,
         category: galCategory,
         image: galImage,
         caption: galCaption || `${finalTitle} — Image of Christ Bible College, Vellore.`
       });
-      showToast('success', 'Picture uploaded and published to the website Gallery page!');
+      showToast('success', 'Picture uploaded, saved to Supabase & published to the live Website Gallery!');
     }
     setGalTitle('');
     setGalImage('');
@@ -607,6 +610,7 @@ export const AdminView: React.FC = () => {
   };
 
   const handleEditGalleryClick = (g: GalleryPhoto) => {
+    setAutoCreatedGalleryId(null);
     setEditingGalleryId(g.id);
     setGalTitle(g.title);
     setGalCategory(g.category);
@@ -1092,14 +1096,55 @@ export const AdminView: React.FC = () => {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const file = files[0];
     setIsUploading(true);
     try {
-      const res = await uploadFileToStorage(selectedBucket, file);
-      if (res.url) {
-        showToast('success', `Uploaded ${file.name} to bucket '${selectedBucket}'.`);
+      let uploadedCount = 0;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const res = await uploadFileToStorage(selectedBucket, file);
+        if (res.url) {
+          uploadedCount++;
+          const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+          const formattedTitle = cleanName.charAt(0).toUpperCase() + cleanName.slice(1) || 'Uploaded Asset';
+          const sizeStr = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+
+          if (selectedBucket === 'gallery' && file.type.startsWith('image/')) {
+            await addGalleryPhoto({
+              title: formattedTitle,
+              category: 'Campus',
+              image: res.url,
+              caption: `${formattedTitle} — Image of Christ Bible College, Vellore.`
+            });
+          } else if (selectedBucket === 'study-materials') {
+            await addStudyMaterial({
+              title: formattedTitle,
+              courseCode: 'B.Th',
+              courseName: 'Bachelor of Theology (B.Th)',
+              subject: 'Biblical & Theological Studies',
+              facultyName: 'Pr. Christopher',
+              type: 'PDF',
+              fileSize: sizeStr,
+              description: `${formattedTitle} — Uploaded to Study Materials.`,
+              downloadUrl: res.url
+            });
+          } else if (selectedBucket === 'college-documents') {
+            await addDownload({
+              title: formattedTitle,
+              category: 'Academic',
+              format: file.name.toLowerCase().endsWith('.docx') ? 'DOCX' : 'PDF',
+              fileSize: sizeStr,
+              description: `${formattedTitle} — Official College Document.`
+            });
+          }
+        }
+      }
+      if (uploadedCount > 0) {
+        showToast(
+          'success',
+          `Uploaded ${uploadedCount} file(s) to Supabase bucket '${selectedBucket}' and published to live website!`
+        );
       } else {
-        showToast('error', res.error || 'Failed to upload file.');
+        showToast('error', 'Failed to upload file.');
       }
     } catch (err: any) {
       showToast('error', err?.message || 'Upload error');
@@ -2273,6 +2318,39 @@ export const AdminView: React.FC = () => {
                 </div>
 
                 <div>
+                  <label className="block font-bold text-stone-700 mb-1">Upload PDF / Study File from Device</label>
+                  <label className="w-full border border-dashed border-blue-900/40 hover:border-blue-900 bg-blue-50/40 rounded-xl p-2.5 flex items-center justify-center space-x-2 cursor-pointer transition-all">
+                    <UploadCloud className="w-4 h-4 text-blue-900" />
+                    <span className="font-bold text-blue-950 text-[11px]">
+                      {isUploading ? 'Uploading File...' : 'Choose PDF / Document from Device'}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,image/*"
+                      className="hidden"
+                      onChange={async e => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          setIsUploading(true);
+                          const res = await uploadFileToStorage('study-materials', f);
+                          setIsUploading(false);
+                          if (res.url) {
+                            setMatUrl(res.url);
+                            setMatSize(`${(f.size / (1024 * 1024)).toFixed(2)} MB`);
+                            if (!matTitle.trim()) {
+                              const cleanName = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+                              setMatTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+                            }
+                            showToast('success', `File "${f.name}" attached to study material!`);
+                          }
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <div>
                   <label className="block font-bold text-stone-700 mb-1">Summary / Description</label>
                   <textarea
                     rows={2}
@@ -2446,14 +2524,38 @@ export const AdminView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1">Banner Image URL</label>
-                  <input
-                    type="text"
-                    value={eventImage}
-                    onChange={e => setEventImage(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                  />
+                  <label className="block font-bold text-stone-700 mb-1">Banner Image (Upload or URL)</label>
+                  <div className="flex gap-2 mb-1.5">
+                    <label className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-950 border border-blue-200 font-bold text-[11px] inline-flex items-center space-x-1.5 cursor-pointer shrink-0">
+                      <UploadCloud className="w-3.5 h-3.5 text-blue-900" />
+                      <span>{isUploading ? 'Uploading...' : 'Upload Banner'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async e => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            setIsUploading(true);
+                            const res = await uploadFileToStorage('gallery', f);
+                            setIsUploading(false);
+                            if (res.url) {
+                              setEventImage(res.url);
+                              showToast('success', 'Event banner photo uploaded!');
+                            }
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    <input
+                      type="text"
+                      value={eventImage}
+                      onChange={e => setEventImage(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -2590,29 +2692,30 @@ export const AdminView: React.FC = () => {
                     {editingGalleryId ? <Edit3 className="w-5 h-5 text-amber-600" /> : <Plus className="w-5 h-5 text-blue-900" />}
                     <span>{editingGalleryId ? 'Edit Gallery Picture' : 'Upload Picture with Details'}</span>
                   </h3>
-                  {editingGalleryId && (
+                  {(editingGalleryId || autoCreatedGalleryId) && (
                     <button
                       type="button"
                       onClick={() => {
                         setEditingGalleryId(null);
+                        setAutoCreatedGalleryId(null);
                         setGalTitle('');
                         setGalImage('');
                         setGalCaption('');
                       }}
                       className="text-xs text-stone-500 hover:text-slate-900 underline cursor-pointer"
                     >
-                      Cancel Edit
+                      {editingGalleryId ? 'Cancel Edit' : 'Reset Form'}
                     </button>
                   )}
                 </div>
 
                 <form onSubmit={handleSaveGallery} className="space-y-3.5 text-xs">
                   <div>
-                    <label className="block font-bold text-stone-700 mb-1.5">1. Select Picture from Computer *</label>
+                    <label className="block font-bold text-stone-700 mb-1.5">1. Select Picture from Computer / Phone *</label>
                     <label className="w-full border-2 border-dashed border-blue-900/30 hover:border-blue-900 bg-blue-50/40 hover:bg-blue-50/80 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all">
                       <UploadCloud className="w-7 h-7 text-blue-900 mb-1.5" />
                       <span className="font-bold text-blue-950 text-xs">Click to Choose Picture from Device</span>
-                      <span className="text-[11px] text-stone-500 mt-0.5">Supports JPG, PNG, WEBP</span>
+                      <span className="text-[11px] text-stone-500 mt-0.5">Auto-saves to Supabase & Website Gallery immediately</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -2625,13 +2728,32 @@ export const AdminView: React.FC = () => {
                             setIsUploading(false);
                             if (res.url) {
                               setGalImage(res.url);
-                              if (!galTitle.trim()) {
-                                const cleanName = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-                                setGalTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+                              const cleanName = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+                              const autoTitle = cleanName.charAt(0).toUpperCase() + cleanName.slice(1) || 'Campus Photo';
+                              const nextTitle = editingGalleryId && galTitle.trim() ? galTitle.trim() : autoTitle;
+                              setGalTitle(nextTitle);
+
+                              if (editingGalleryId) {
+                                await updateGalleryPhoto(editingGalleryId, {
+                                  image: res.url,
+                                  title: nextTitle,
+                                  category: galCategory,
+                                  caption: galCaption || `${nextTitle} — Image of Christ Bible College, Vellore.`
+                                });
+                                showToast('success', 'Gallery picture updated in Supabase & Website Gallery!');
+                              } else {
+                                const created = await addGalleryPhoto({
+                                  title: nextTitle,
+                                  category: galCategory,
+                                  image: res.url,
+                                  caption: galCaption || `${nextTitle} — Image of Christ Bible College, Vellore.`
+                                });
+                                setAutoCreatedGalleryId(created.id);
+                                showToast('success', 'Picture uploaded, saved to Supabase & published to Live Website Gallery!');
                               }
-                              showToast('success', 'Picture loaded! Click "Publish Picture to Gallery" below.');
                             }
                           }
+                          e.target.value = '';
                         }}
                       />
                     </label>
@@ -2640,9 +2762,20 @@ export const AdminView: React.FC = () => {
                   {galImage && (
                     <div className="rounded-2xl overflow-hidden border border-stone-200 bg-stone-50 relative">
                       <img src={galImage} alt="Preview" className="w-full h-40 object-cover" />
+                      {autoCreatedGalleryId && (
+                        <span className="absolute top-2 left-2 px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold shadow">
+                          ✓ Live in Website Gallery
+                        </span>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setGalImage('')}
+                        onClick={() => {
+                          if (autoCreatedGalleryId) {
+                            deleteGalleryPhoto(autoCreatedGalleryId);
+                            setAutoCreatedGalleryId(null);
+                          }
+                          setGalImage('');
+                        }}
                         className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-slate-900/80 text-white text-[10px] font-bold hover:bg-rose-600 cursor-pointer"
                       >
                         Remove
@@ -2655,7 +2788,14 @@ export const AdminView: React.FC = () => {
                     <input
                       type="text"
                       value={galImage}
-                      onChange={e => setGalImage(e.target.value)}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setGalImage(val);
+                        const targetId = editingGalleryId || autoCreatedGalleryId;
+                        if (targetId && val.trim()) {
+                          updateGalleryPhoto(targetId, { image: val.trim() });
+                        }
+                      }}
                       placeholder="https://... (auto-filled when uploading file)"
                       className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                     />
@@ -2667,7 +2807,14 @@ export const AdminView: React.FC = () => {
                       type="text"
                       required
                       value={galTitle}
-                      onChange={e => setGalTitle(e.target.value)}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setGalTitle(val);
+                        const targetId = editingGalleryId || autoCreatedGalleryId;
+                        if (targetId && val.trim()) {
+                          updateGalleryPhoto(targetId, { title: val.trim() });
+                        }
+                      }}
                       placeholder="e.g. Convocation Ceremony 2025"
                       className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                     />
@@ -2677,7 +2824,14 @@ export const AdminView: React.FC = () => {
                     <label className="block font-bold text-stone-700 mb-1">3. Gallery Category</label>
                     <select
                       value={galCategory}
-                      onChange={e => setGalCategory(e.target.value as any)}
+                      onChange={e => {
+                        const val = e.target.value as GalleryPhoto['category'];
+                        setGalCategory(val);
+                        const targetId = editingGalleryId || autoCreatedGalleryId;
+                        if (targetId) {
+                          updateGalleryPhoto(targetId, { category: val });
+                        }
+                      }}
                       className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                     >
                       <option value="Campus">Campus</option>
@@ -2695,7 +2849,14 @@ export const AdminView: React.FC = () => {
                     <textarea
                       rows={3}
                       value={galCaption}
-                      onChange={e => setGalCaption(e.target.value)}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setGalCaption(val);
+                        const targetId = editingGalleryId || autoCreatedGalleryId;
+                        if (targetId) {
+                          updateGalleryPhoto(targetId, { caption: val });
+                        }
+                      }}
                       placeholder="Describe this campus moment..."
                       className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                     />
@@ -2706,7 +2867,13 @@ export const AdminView: React.FC = () => {
                     disabled={isUploading}
                     className="w-full py-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider transition-colors shadow cursor-pointer"
                   >
-                    {isUploading ? 'Uploading Picture...' : editingGalleryId ? 'Update Gallery Picture' : 'Publish Picture to Gallery'}
+                    {isUploading
+                      ? 'Uploading Picture...'
+                      : editingGalleryId
+                      ? 'Update Gallery Picture'
+                      : autoCreatedGalleryId
+                      ? 'Save Details & Upload Another Picture'
+                      : 'Publish Picture to Gallery'}
                   </button>
                 </form>
               </div>
@@ -3990,13 +4157,37 @@ export const AdminView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Profile Photo URL</label>
-                <input
-                  type="text"
-                  value={newStdAvatar}
-                  onChange={e => setNewStdAvatar(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                />
+                <label className="block font-bold text-slate-700 uppercase mb-1">Profile Photo (Upload or URL)</label>
+                <div className="flex gap-2">
+                  <label className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-950 border border-blue-200 font-bold text-[11px] inline-flex items-center space-x-1.5 cursor-pointer shrink-0">
+                    <UploadCloud className="w-3.5 h-3.5 text-blue-900" />
+                    <span>{isUploading ? 'Uploading...' : 'Upload Photo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async e => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          setIsUploading(true);
+                          const res = await uploadFileToStorage('student-photos', f);
+                          setIsUploading(false);
+                          if (res.url) {
+                            setNewStdAvatar(res.url);
+                            showToast('success', 'Student photo uploaded!');
+                          }
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    value={newStdAvatar}
+                    onChange={e => setNewStdAvatar(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 pt-3">
@@ -4113,13 +4304,37 @@ export const AdminView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Photo URL</label>
-                <input
-                  type="text"
-                  value={facPhoto}
-                  onChange={e => setFacPhoto(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                />
+                <label className="block font-bold text-slate-700 uppercase mb-1">Faculty Photo (Upload or URL)</label>
+                <div className="flex gap-2">
+                  <label className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-950 border border-blue-200 font-bold text-[11px] inline-flex items-center space-x-1.5 cursor-pointer shrink-0">
+                    <UploadCloud className="w-3.5 h-3.5 text-blue-900" />
+                    <span>{isUploading ? 'Uploading...' : 'Upload Photo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async e => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          setIsUploading(true);
+                          const res = await uploadFileToStorage('faculty-photos', f);
+                          setIsUploading(false);
+                          if (res.url) {
+                            setFacPhoto(res.url);
+                            showToast('success', 'Faculty photo uploaded!');
+                          }
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    value={facPhoto}
+                    onChange={e => setFacPhoto(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
               </div>
 
               <div>
