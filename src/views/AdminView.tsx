@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCollege } from '../context/CollegeContext';
 import { ApplicationSubmission, UserRole, StorageBucket } from '../types';
 import { LiquidCooledServerWidget } from '../components/LiquidCooledServerWidget';
@@ -43,11 +43,18 @@ import {
   Palette,
   Sun,
   Moon,
-  Droplets
+  Droplets,
+  User,
+  UserCheck,
+  Mail
 } from 'lucide-react';
 
 export const AdminView: React.FC = () => {
   const {
+    activePage,
+    setActivePage,
+    loginMode,
+    setLoginMode,
     applications,
     updateApplicationStatus,
     notices,
@@ -69,6 +76,13 @@ export const AdminView: React.FC = () => {
     currentUser,
     currentAuthRole,
     loginWithPin,
+    loginWithAdminCredentials,
+    loginWithSupabase,
+    signUpWithSupabase,
+    loginStudent,
+    isStudentLoggedIn,
+    studentProfile,
+    authLoading,
     logout,
     uploadedFiles,
     uploadFileToStorage,
@@ -86,7 +100,21 @@ export const AdminView: React.FC = () => {
   const [adminPin, setAdminPin] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPass, setAdminPass] = useState('');
+  const [userIdentifier, setUserIdentifier] = useState('');
+  const [userPassword, setUserPassword] = useState('');
+  const [userFullName, setUserFullName] = useState('');
+  const [isUserSignUp, setIsUserSignUp] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activePage === 'login-user') {
+      setLoginMode('user');
+      setAuthError(null);
+    } else if (activePage === 'login-admin' || activePage === 'admin') {
+      setLoginMode('admin');
+      setAuthError(null);
+    }
+  }, [activePage, setLoginMode]);
 
   // Active Admin Sub-Tab
   const [adminTab, setAdminTab] = useState<
@@ -169,13 +197,90 @@ export const AdminView: React.FC = () => {
   const isAuthorized =
     currentUser && (currentUser.role === 'super_admin' || currentUser.role === 'admin' || currentUser.role === 'faculty');
 
-  const handlePinLogin = (e: React.FormEvent) => {
+  const handlePinLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginWithPin(adminPin)) {
-      setAuthError(null);
+    setAuthError(null);
+
+    if (adminEmail.trim() && adminPass.trim()) {
+      if (loginWithAdminCredentials(adminEmail, adminPass)) {
+        showToast('success', 'Authenticated as College Administrator.');
+        return;
+      }
+      const res = await loginWithSupabase(adminEmail.trim(), adminPass.trim());
+      if (res.success) {
+        showToast('success', 'Authenticated via Cloud Admin Account.');
+        return;
+      }
+    }
+
+    if (adminPin.trim() && loginWithPin(adminPin)) {
       showToast('success', 'Authenticated as College Administrator.');
+      return;
+    }
+
+    if (adminPass.trim() && loginWithPin(adminPass)) {
+      showToast('success', 'Authenticated as College Administrator.');
+      return;
+    }
+
+    setAuthError('Invalid Admin credentials or PIN. Access restricted to authorized personnel.');
+  };
+
+  const handleUserLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+
+    if (isUserSignUp) {
+      if (!userFullName.trim() || !userIdentifier.trim() || !userPassword.trim()) {
+        setAuthError('Please enter your full name, email address, and password.');
+        return;
+      }
+      const res = await signUpWithSupabase(userIdentifier.trim(), userPassword.trim(), userFullName.trim(), 'student');
+      if (res.success) {
+        setActivePage('students-login');
+        return;
+      }
+      // Register locally in student roster as fallback
+      const regNo = `ICBC-2026-USR-${Math.floor(10 + Math.random() * 90)}`;
+      await addStudent({
+        id: `std-${Date.now()}`,
+        regNo,
+        name: userFullName.trim(),
+        email: userIdentifier.trim(),
+        phone: '+91 95004 23126',
+        courseId: 'bth',
+        courseTitle: 'Bachelor of Theology',
+        currentYear: 'Year 1 (Semester I)',
+        batch: 'Batch of 2026–2029',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+        attendancePercent: 100,
+        gpa: '4.0 / 4.0',
+        enrolledSubjects: [],
+        recentAssignments: []
+      });
+      loginStudent(regNo);
+      setActivePage('students-login');
+      return;
+    }
+
+    if (!userIdentifier.trim()) {
+      setAuthError('Please enter your Email or Student Registration Number.');
+      return;
+    }
+
+    if (userIdentifier.includes('@') && userPassword.trim()) {
+      const res = await loginWithSupabase(userIdentifier.trim(), userPassword.trim());
+      if (res.success) {
+        setActivePage('students-login');
+        return;
+      }
+    }
+
+    const ok = loginStudent(userIdentifier.trim());
+    if (ok) {
+      setActivePage('students-login');
     } else {
-      setAuthError('Incorrect Administrative PIN. Access restricted to authorized personnel.');
+      setAuthError('User account or Registration Number not found. Try e.g. ICBC-2024-M08 or create a new user account.');
     }
   };
 
@@ -314,59 +419,218 @@ export const AdminView: React.FC = () => {
     return matchesQuery && matchesCourse && matchesStatus;
   });
 
-  // If NOT authorized as admin/faculty
-  if (!isAuthorized) {
+  // If user selected 'login-user' or is not authorized as admin
+  if (activePage === 'login-user' || !isAuthorized) {
     return (
-      <div className="min-h-[75vh] flex items-center justify-center px-4 py-16 font-sans">
-        <div className="max-w-md w-full bg-white rounded-3xl border border-stone-200 shadow-2xl p-8 sm:p-10 space-y-6 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 text-amber-400 mx-auto flex items-center justify-center shadow-lg">
-            <Shield className="w-8 h-8" />
-          </div>
-
-          <div className="space-y-2">
-            <span className="text-xs uppercase tracking-widest text-amber-700 font-bold">
-              Secured Administrative Portal
-            </span>
-            <h2 className="font-cinzel text-2xl font-bold text-slate-900">
-              Administrative Access
-            </h2>
-            <p className="text-xs text-stone-500">
-              Authenticate via Supabase Auth credentials or access via the College Administrative PIN.
-            </p>
-          </div>
-
-          {authError && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2 text-left">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{authError}</span>
-            </div>
-          )}
-
-          <form onSubmit={handlePinLogin} className="space-y-4 text-left">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Admin Master PIN
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  value={adminPin}
-                  onChange={e => setAdminPin(e.target.value)}
-                  placeholder="Enter admin PIN (e.g. admin123)"
-                  className="w-full px-4 py-3 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900 text-sm pl-10"
-                />
-                <Key className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              </div>
-            </div>
+      <div className="min-h-[78vh] flex items-center justify-center px-4 py-14 font-sans bg-[#faf8f5]">
+        <div className="max-w-md w-full bg-white rounded-3xl border border-stone-200 shadow-2xl p-7 sm:p-9 space-y-6 text-center">
+          {/* Mode Switcher Tabs: User Login | Admin Login */}
+          <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => {
+                setLoginMode('user');
+                setActivePage('login-user');
+                setAuthError(null);
+              }}
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
+                loginMode === 'user'
+                  ? 'bg-[#0f2444] text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>User Login</span>
+            </button>
 
             <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold text-sm tracking-wider uppercase transition-all shadow-md flex items-center justify-center space-x-2"
+              type="button"
+              onClick={() => {
+                setLoginMode('admin');
+                setActivePage('login-admin');
+                setAuthError(null);
+              }}
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
+                loginMode === 'admin'
+                  ? 'bg-[#0f2444] text-amber-300 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
-              <Lock className="w-4 h-4" />
-              <span>Verify PIN & Access</span>
+              <Shield className="w-3.5 h-3.5" />
+              <span>Admin Login</span>
             </button>
-          </form>
+          </div>
+
+          {loginMode === 'user' ? (
+            <>
+              <div className="w-15 h-15 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 text-amber-400 mx-auto flex items-center justify-center shadow-lg">
+                <UserCheck className="w-8 h-8" />
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-xs uppercase tracking-widest text-amber-700 font-bold">
+                  Student & User Portal
+                </span>
+                <h2 className="font-cinzel text-2xl font-bold text-slate-900">
+                  {isUserSignUp ? 'Create User Account' : 'User Login'}
+                </h2>
+                <p className="text-xs text-stone-500">
+                  {isUserSignUp
+                    ? 'Register your account to access courses, study materials, and student services.'
+                    : 'Sign in with your Email or Student Registration Number to access your portal.'}
+                </p>
+              </div>
+
+              {authError && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2 text-left">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{authError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleUserLogin} className="space-y-4 text-left">
+                {isUserSignUp && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={userFullName}
+                      onChange={e => setUserFullName(e.target.value)}
+                      placeholder="Enter your full name"
+                      className="w-full px-4 py-3 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900 text-sm"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    {isUserSignUp ? 'Email Address *' : 'Email or Registration No. *'}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={userIdentifier}
+                      onChange={e => setUserIdentifier(e.target.value)}
+                      placeholder={isUserSignUp ? 'you@example.com' : 'e.g. ICBC-2024-M08 or email'}
+                      className="w-full px-4 py-3 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900 text-sm pl-10"
+                    />
+                    <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={userPassword}
+                      onChange={e => setUserPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      className="w-full px-4 py-3 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900 text-sm pl-10"
+                    />
+                    <Key className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full py-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-bold text-sm tracking-wider uppercase transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer"
+                >
+                  <UserCheck className="w-4 h-4 text-amber-300" />
+                  <span>{authLoading ? 'Please Wait...' : isUserSignUp ? 'Create User Account' : 'Sign In as User'}</span>
+                </button>
+              </form>
+
+              <div className="pt-2 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600">
+                <span>{isUserSignUp ? 'Already have an account?' : 'New student or user?'}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUserSignUp(!isUserSignUp);
+                    setAuthError(null);
+                  }}
+                  className="font-bold text-blue-900 hover:underline cursor-pointer"
+                >
+                  {isUserSignUp ? 'Back to User Login' : 'Create User Account'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-15 h-15 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 text-amber-400 mx-auto flex items-center justify-center shadow-lg">
+                <Shield className="w-8 h-8" />
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-xs uppercase tracking-widest text-amber-700 font-bold">
+                  Secured Administrative Portal
+                </span>
+                <h2 className="font-cinzel text-2xl font-bold text-slate-900">
+                  Admin Login
+                </h2>
+                <p className="text-xs text-stone-500">
+                  Sign in with your Administrator Email & Password or College Admin PIN.
+                </p>
+              </div>
+
+              {authError && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2 text-left">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{authError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handlePinLogin} className="space-y-4 text-left">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Admin Email (Optional if using PIN)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={adminEmail}
+                      onChange={e => setAdminEmail(e.target.value)}
+                      placeholder="e.g. imageofchrist@gmail.com"
+                      className="w-full px-4 py-3 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900 text-sm pl-10"
+                    />
+                    <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Admin Password or Master PIN *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={adminPin}
+                      onChange={e => {
+                        setAdminPin(e.target.value);
+                        setAdminPass(e.target.value);
+                      }}
+                      placeholder="Enter Admin Password or PIN"
+                      className="w-full px-4 py-3 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-blue-900 text-sm pl-10"
+                    />
+                    <Key className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold text-sm tracking-wider uppercase transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>Sign In as Admin</span>
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
     );

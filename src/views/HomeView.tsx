@@ -23,7 +23,7 @@ import {
   Check
 } from 'lucide-react';
 
-import heroBanner from '../assets/images/icbc_hero_banner_1790323989549.jpg';
+import heroBanner from '../assets/images/icbc_campus_building_1790394522586.jpg';
 import officialLogo from '../assets/images/icbc_official_logo_1790324060325.jpg';
 import graduationPhoto from '../assets/images/icbc_graduation_1790324006996.jpg';
 import classroomPhoto from '../assets/images/icbc_classroom_1790324037922.jpg';
@@ -45,75 +45,99 @@ export const HomeView: React.FC = () => {
 
   return (
     <div className="font-sans text-slate-800 bg-white">
-      {/* 1. HERO SECTION - MATCHING IMAGE EXACTLY */}
-      <section className="relative overflow-hidden min-h-[580px] lg:min-h-[660px] flex items-center bg-slate-900">
-        {/* Background Image: Panoramic Sunrise with Christ blessing the harvest & open Bible */}
+      {/* 1. HERO SECTION - FEATURING CAMPUS BUILDING */}
+      <section className="relative overflow-hidden min-h-[580px] lg:min-h-[640px] flex items-center bg-slate-900">
+        {/* Background Image: Image of Christ Bible College Campus Building */}
         <div className="absolute inset-0 z-0">
           <img
             src={heroBanner}
-            alt="Image of Christ Bible College Hero - Biblical Education & Harvest"
-            className="w-full h-full object-cover object-center lg:object-[center_25%]"
+            alt="Image of Christ Bible College Campus Building"
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover object-center"
           />
-          {/* Subtle directional gradient overlay to guarantee 100% text legibility while showing the golden sunrise and Christ */}
-          <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-white/85 to-transparent md:max-w-[70%] lg:max-w-[55%]"></div>
-          {/* Gentle warm tint */}
-          <div className="absolute inset-0 bg-amber-500/5 mix-blend-multiply pointer-events-none"></div>
+          {/* Subtle directional gradient overlay for text legibility on the left while keeping the campus building visible */}
+          <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-white/85 to-white/15 lg:to-transparent"></div>
         </div>
 
         {/* Content Container */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
-          <div className="max-w-2xl space-y-6">
-            {/* College Title */}
-            <div>
-              <span className="text-xs uppercase tracking-widest text-amber-700 font-bold block mb-1">
-                Vellore, Tamil Nadu • Since 2020
-              </span>
-              <h1 className="font-cinzel text-3xl sm:text-5xl lg:text-6xl font-black text-[#0f2444] tracking-tight leading-[1.1]">
-                Image of Christ <br />
-                <span className="text-[#132c54]">Bible College</span>
-              </h1>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-6 space-y-6">
+              {/* College Title */}
+              <div>
+                <span className="text-xs uppercase tracking-widest text-amber-700 font-bold block mb-1">
+                  Vellore, Tamil Nadu • Since 2020
+                </span>
+                <h1 className="font-cinzel text-3xl sm:text-5xl lg:text-6xl font-black text-[#0f2444] tracking-tight leading-[1.1]">
+                  Image of Christ <br />
+                  <span className="text-[#132c54]">Bible College</span>
+                </h1>
+              </div>
+
+              {/* Subtitle */}
+              <p className="font-serif italic text-xl sm:text-2xl text-slate-700 font-medium">
+                Equipping Lives Through the Word of God
+              </p>
+
+              {/* Scripture Quote Box */}
+              <div className="border-l-3 border-amber-600 pl-4 py-1 space-y-1">
+                <p className="font-serif italic text-base sm:text-lg text-slate-800 leading-snug">
+                  “Just as You sent Me into the world, <br />
+                  I also have sent them into the world.”
+                </p>
+                <p className="text-xs font-semibold text-amber-800 tracking-wider uppercase font-sans">
+                  John 17:18
+                </p>
+              </div>
+
+              {/* Motto Pillars */}
+              <div className="pt-1">
+                <p className="text-xs sm:text-sm font-bold tracking-widest text-[#0f2444] uppercase font-sans">
+                  TRANSFORMING LIVES <span className="text-amber-600 px-1.5 font-normal">|</span> REACHING NATIONS <span className="text-amber-600 px-1.5 font-normal">|</span> BUILDING REVIVAL
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-4 pt-3">
+                <button
+                  onClick={() => setActivePage('admissions-application')}
+                  className="px-7 py-3.5 rounded-full bg-[#d97706] hover:bg-[#b45309] text-white font-bold text-sm tracking-wide shadow-md hover:shadow-lg transition-all flex items-center group active:scale-95 cursor-pointer"
+                >
+                  <span>Apply Now</span>
+                  <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                <button
+                  onClick={() => setActivePage('courses')}
+                  className="px-6 py-3.5 rounded-full bg-white/90 hover:bg-white text-[#0f2444] font-bold text-sm border border-slate-300 hover:border-slate-400 shadow-sm transition-all flex items-center active:scale-95 cursor-pointer"
+                >
+                  <BookOpen className="w-4 h-4 mr-2 text-[#0f2444]" />
+                  <span>Explore Courses</span>
+                </button>
+              </div>
             </div>
 
-            {/* Subtitle */}
-            <p className="font-serif italic text-xl sm:text-2xl text-slate-700 font-medium">
-              Equipping Lives Through the Word of God
-            </p>
-
-            {/* Scripture Quote Box */}
-            <div className="border-l-3 border-amber-600 pl-4 py-1 space-y-1">
-              <p className="font-serif italic text-base sm:text-lg text-slate-800 leading-snug">
-                “Just as You sent Me into the world, <br />
-                I also have sent them into the world.”
-              </p>
-              <p className="text-xs font-semibold text-amber-800 tracking-wider uppercase font-sans">
-                John 17:18
-              </p>
-            </div>
-
-            {/* Motto Pillars */}
-            <div className="pt-1">
-              <p className="text-xs sm:text-sm font-bold tracking-widest text-[#0f2444] uppercase font-sans">
-                TRANSFORMING LIVES <span className="text-amber-600 px-1.5 font-normal">|</span> REACHING NATIONS <span className="text-amber-600 px-1.5 font-normal">|</span> BUILDING REVIVAL
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-4 pt-3">
-              <button
-                onClick={() => setActivePage('admissions-application')}
-                className="px-7 py-3.5 rounded-full bg-[#d97706] hover:bg-[#b45309] text-white font-bold text-sm tracking-wide shadow-md hover:shadow-lg transition-all flex items-center group active:scale-95 cursor-pointer"
-              >
-                <span>Apply Now</span>
-                <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-              </button>
-
-              <button
-                onClick={() => setActivePage('courses')}
-                className="px-6 py-3.5 rounded-full bg-white/90 hover:bg-white text-[#0f2444] font-bold text-sm border border-slate-300 hover:border-slate-400 shadow-sm transition-all flex items-center active:scale-95 cursor-pointer"
-              >
-                <BookOpen className="w-4 h-4 mr-2 text-[#0f2444]" />
-                <span>Explore Courses</span>
-              </button>
+            {/* Right Column: Clear Unobstructed Campus Building Photo Showcase */}
+            <div className="lg:col-span-6">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white/95 bg-white group">
+                <img
+                  src={heroBanner}
+                  alt="Image of Christ Bible College Building"
+                  referrerPolicy="no-referrer"
+                  className="w-full h-[280px] sm:h-[360px] lg:h-[400px] object-cover object-center group-hover:scale-102 transition-transform duration-500"
+                />
+                <div className="bg-[#0f2444] text-white px-4 py-2.5 flex items-center justify-between text-xs">
+                  <div className="flex items-center space-x-2">
+                    <Building className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span className="font-cinzel font-bold tracking-wider uppercase">
+                      Image of Christ Bible College Campus
+                    </span>
+                  </div>
+                  <span className="text-amber-300 font-semibold hidden sm:inline">
+                    Vellore, Tamil Nadu
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

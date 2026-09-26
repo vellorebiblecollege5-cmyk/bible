@@ -28,6 +28,8 @@ import {
 export const StudentsView: React.FC = () => {
   const {
     activePage,
+    setActivePage,
+    setLoginMode,
     studentProfile,
     isStudentLoggedIn,
     loginStudent,
@@ -154,6 +156,29 @@ export const StudentsView: React.FC = () => {
 
         <div className="max-w-md mx-auto px-4">
           <div className="bg-white rounded-3xl border border-stone-200 shadow-xl p-8 sm:p-10 space-y-6 text-center">
+            {/* Mode Switcher Tabs: User Login | Admin Login */}
+            <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+              <button
+                type="button"
+                className="py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 bg-[#0f2444] text-white shadow-sm cursor-pointer"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>User Login</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMode('admin');
+                  setActivePage('login-admin');
+                }}
+                className="py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>Admin Login</span>
+              </button>
+            </div>
+
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 text-amber-400 mx-auto flex items-center justify-center shadow-lg">
               <GraduationCap className="w-8 h-8" />
             </div>

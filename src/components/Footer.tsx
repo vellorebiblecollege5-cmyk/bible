@@ -293,16 +293,23 @@ export const Footer: React.FC = () => {
             <div className="flex items-center space-x-4 flex-shrink-0">
               <button
                 onClick={() => navigateTo('about')}
-                className="text-amber-400 hover:underline"
+                className="text-amber-400 hover:underline cursor-pointer"
               >
                 Statement of Faith
               </button>
               <span>•</span>
               <button
-                onClick={() => navigateTo('admin')}
-                className="text-slate-400 hover:text-white"
+                onClick={() => navigateTo('login-user')}
+                className="text-slate-300 hover:text-amber-400 cursor-pointer"
               >
-                Admin Gateway
+                User Login
+              </button>
+              <span>•</span>
+              <button
+                onClick={() => navigateTo('login-admin')}
+                className="text-slate-300 hover:text-amber-400 cursor-pointer"
+              >
+                Admin Login
               </button>
             </div>
           </div>

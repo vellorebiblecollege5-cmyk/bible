@@ -33,7 +33,7 @@ const MainContent: React.FC = () => {
     if (activePage === 'gallery') return <GalleryView />;
     if (activePage === 'downloads') return <DownloadsView />;
     if (activePage === 'contact') return <ContactView />;
-    if (activePage === 'admin') return <AdminView />;
+    if (activePage === 'admin' || activePage === 'login-user' || activePage === 'login-admin') return <AdminView />;
     return <HomeView />;
   };
 

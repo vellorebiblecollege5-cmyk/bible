@@ -65,7 +65,9 @@ export type ActivePage =
   | 'gallery'
   | 'downloads'
   | 'contact'
-  | 'admin';
+  | 'admin'
+  | 'login-user'
+  | 'login-admin';
 
 export interface SupabaseSyncStatus {
   connected: boolean;
@@ -78,6 +80,8 @@ export interface SupabaseSyncStatus {
 interface CollegeContextType {
   activePage: ActivePage;
   setActivePage: (page: ActivePage) => void;
+  loginMode: 'user' | 'admin';
+  setLoginMode: (mode: 'user' | 'admin') => void;
   courses: Course[];
   faculty: FacultyMember[];
   // Student Portal
@@ -146,7 +150,7 @@ const STORAGE_KEYS = {
   STUDENTS: 'icbc_students_v2',
   SUBJECTS: 'icbc_subjects_v2',
   COURSES: 'icbc_courses_v2',
-  GALLERY: 'icbc_gallery_v2',
+  GALLERY: 'icbc_gallery_v3',
   UPLOADED_FILES: 'icbc_uploaded_files_v2',
   AUTH_USER: 'icbc_auth_user_v2',
   STUDENT_AUTH: 'icbc_student_auth_v2'
@@ -154,6 +158,7 @@ const STORAGE_KEYS = {
 
 export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activePage, setActivePage] = useState<ActivePage>('home');
+  const [loginMode, setLoginMode] = useState<'user' | 'admin'>('user');
   const [selectedCourseForApply, setSelectedCourseForApply] = useState<string | null>(null);
   const [activeDocumentPreview, setActiveDocumentPreview] = useState<{ title: string; type: string; content?: string } | null>(null);
 
@@ -1226,6 +1231,8 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       value={{
         activePage,
         setActivePage,
+        loginMode,
+        setLoginMode,
         courses,
         faculty,
         studentProfile,

@@ -16,7 +16,7 @@ import gradCourtyard from '../assets/images/icbc_grad_courtyard_1790326274351.jp
 import gradStageService from '../assets/images/icbc_grad_stage_service_1790326295032.jpg';
 import gradOfficialPhoto from '../assets/images/icbc_graduation_1790324006996.jpg';
 import classroomPhoto from '../assets/images/icbc_classroom_1790324037922.jpg';
-import heroBannerPhoto from '../assets/images/icbc_hero_banner_1790323989549.jpg';
+import heroBannerPhoto from '../assets/images/icbc_campus_building_1790394522586.jpg';
 
 export const COLLEGE_INFO = {
   name: 'Image of Christ Bible College',
@@ -669,10 +669,10 @@ export const INITIAL_GALLERY: GalleryPhoto[] = [
   },
   {
     id: 'gal-vision-1',
-    title: 'ICBC Foundation Mandate: John 17:18',
+    title: 'Image of Christ Bible College Campus Building',
     category: 'Campus',
     image: heroBannerPhoto,
-    caption: '“As You sent Me into the world, I also have sent them into the world” — Equipping lives through the Word of God.'
+    caption: 'Official campus building of Image of Christ Bible College — Equipping lives through the Word of God.'
   },
   {
     id: 'gal-grad-3',
