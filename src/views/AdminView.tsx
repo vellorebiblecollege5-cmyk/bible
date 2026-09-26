@@ -2733,7 +2733,7 @@ export const AdminView: React.FC = () => {
                 {gallery.length === 0 ? (
                   <div className="bg-white rounded-3xl border-2 border-dashed border-stone-300 p-12 text-center space-y-3">
                     <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto text-amber-700">
-                      <Image className="w-7 h-7" />
+                      <ImageIcon className="w-7 h-7" />
                     </div>
                     <h4 className="font-cinzel text-lg font-bold text-slate-900">
                       Gallery is Currently Empty
