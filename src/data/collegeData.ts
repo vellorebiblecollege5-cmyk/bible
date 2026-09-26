@@ -372,7 +372,9 @@ export const INITIAL_FACULTY: FacultyMember[] = [
     photo: '',
     bio: 'Pr. Christopher serves as Principal & President of Image of Christ Bible College. Leading with a heart for apostolic revival and rural church empowerment, he guides ICBC under the mandate of John 17:18 to train faithful servant-leaders deeply grounded in Scripture, spiritual holiness, and compassionate ministry.',
     subjects: ['Systematic Theology', 'Pastoral Leadership & Church Planting', 'Expository Preaching', 'Spiritual Revival'],
-    quote: '“True theological education does not puff up the mind; it bends the knee before Christ and commissions our hands for the harvest.”'
+    quote: '“True theological education does not puff up the mind; it bends the knee before Christ and commissions our hands for the harvest.”',
+    phone: '+91 95004 23126',
+    email: 'icbc.vellore@gmail.com'
   }
 ];
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCollege } from '../context/CollegeContext';
-import { COLLEGE_INFO, COLLEGE_JOURNEY } from '../data/collegeData';
+import { COLLEGE_INFO, COLLEGE_JOURNEY, INITIAL_FACULTY } from '../data/collegeData';
 import {
   BookOpen,
   GraduationCap,
@@ -32,11 +32,14 @@ export const HomeView: React.FC = () => {
   const {
     setActivePage,
     courses,
+    faculty,
     notices,
     events,
     gallery,
     setSelectedCourseForApply
   } = useCollege();
+
+  const principal = faculty.find(f => f.id === 'fac-1') || faculty[0] || INITIAL_FACULTY[0];
 
   const handleApplyCourse = (courseId: string) => {
     setSelectedCourseForApply(courseId);
@@ -536,7 +539,7 @@ export const HomeView: React.FC = () => {
         </section>
       )}
 
-      {/* 4. WHO WE ARE & PRINCIPAL REV. DR. S. PAUL DINAKARAN LEADERSHIP SECTION */}
+      {/* 4. WHO WE ARE & PRINCIPAL LEADERSHIP SECTION (DYNAMICALLY LINKED TO ADMIN PANEL) */}
       <section className="py-16 bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
@@ -558,31 +561,33 @@ export const HomeView: React.FC = () => {
 
               <div className="space-y-3 text-xs sm:text-sm text-slate-600 leading-relaxed font-sans">
                 <p>
-                  Under the spiritual guidance and leadership of our <strong>Principal & President, Pr. Christopher</strong>, ICBC Vellore has been commissioned to bridge the gap between academic theological rigor and grassroots pastoral compassion.
+                  Under the spiritual guidance and leadership of our <strong>{principal.role}, {principal.name}</strong>, ICBC Vellore has been commissioned to bridge the gap between academic theological rigor and grassroots pastoral compassion.
                 </p>
-                <p>
-                  Whether ministering in remote village churches or urban congregations, our graduates are equipped with sound doctrine, fervent prayer habits, and sacrificial love for souls.
-                </p>
+                {principal.bio && (
+                  <p>
+                    {principal.bio}
+                  </p>
+                )}
               </div>
 
               {/* Direct Contact Phone Highlight */}
               <div className="flex flex-wrap items-center gap-4 pt-2">
                 <a
-                  href="tel:+919500423126"
+                  href={`tel:${(principal.phone || '+919500423126').replace(/\s+/g, '')}`}
                   className="inline-flex items-center px-5 py-3 rounded-xl bg-amber-50 border border-amber-300 hover:bg-amber-100 text-[#0f2444] font-bold text-xs sm:text-sm tracking-wide transition-all shadow-xs"
                 >
                   <Phone className="w-4 h-4 mr-2 text-amber-700" />
-                  <span>Call: +91 95004 23126</span>
+                  <span>Call: {principal.phone || '+91 95004 23126'}</span>
                 </a>
 
                 <a
-                  href="https://wa.me/919500423126"
+                  href={`https://wa.me/${(principal.phone || '919500423126').replace(/[^0-9]/g, '')}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center px-5 py-3 rounded-xl bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 text-emerald-900 font-bold text-xs sm:text-sm tracking-wide transition-all shadow-xs"
                 >
                   <MessageSquare className="w-4 h-4 mr-2 text-emerald-600" />
-                  <span>WhatsApp: 95004 23126</span>
+                  <span>WhatsApp: {principal.phone || '95004 23126'}</span>
                 </a>
               </div>
             </div>
@@ -590,38 +595,42 @@ export const HomeView: React.FC = () => {
             {/* Right: Principal & Official Seal Card */}
             <div className="lg:col-span-5">
               <div className="bg-[#faf8f5] rounded-3xl p-6 sm:p-8 border border-stone-200 shadow-md flex flex-col items-center text-center space-y-4 relative overflow-hidden">
-                {/* Official College Crest Seal from user upload */}
+                {/* Principal Photo or Official College Crest Seal */}
                 <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-amber-500 via-blue-900 to-amber-400 shadow-lg">
                   <img
-                    src={officialLogo}
-                    alt="The Image of Christ Bible College Vellore Seal"
+                    src={principal.photo || officialLogo}
+                    onError={e => {
+                      (e.currentTarget as HTMLImageElement).src = officialLogo;
+                    }}
+                    alt={principal.name}
                     className="w-full h-full object-cover rounded-full bg-white"
                   />
                 </div>
 
                 <div className="space-y-1">
                   <h3 className="font-cinzel text-xl font-bold text-[#0f2444]">
-                    Pr. Christopher
+                    {principal.name}
                   </h3>
                   <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">
-                    Principal & President, ICBC Vellore
+                    {principal.role}
                   </p>
                   <p className="text-[11px] text-slate-500">
-                    Committed to the John 17:18 Mandate
+                    {principal.degrees || 'Committed to the John 17:18 Mandate'}
                   </p>
                 </div>
 
                 <p className="text-xs text-slate-600 italic font-serif leading-relaxed px-2">
-                  “We exist to empower ordinary believers with extraordinary biblical truth, raising disciples who will carry the revival fire of Jesus Christ across every hamlet and town.”
+                  {principal.quote ||
+                    '“We exist to empower ordinary believers with extraordinary biblical truth, raising disciples who will carry the revival fire of Jesus Christ across every hamlet and town.”'}
                 </p>
 
                 <div className="w-full pt-3 border-t border-stone-200 flex items-center justify-between text-xs text-slate-600">
                   <span className="font-medium">Direct Admissions Helpline</span>
                   <a
-                    href="tel:+919500423126"
+                    href={`tel:${(principal.phone || '+919500423126').replace(/\s+/g, '')}`}
                     className="font-bold text-amber-700 hover:text-amber-800"
                   >
-                    95004 23126
+                    {principal.phone || '95004 23126'}
                   </a>
                 </div>
               </div>

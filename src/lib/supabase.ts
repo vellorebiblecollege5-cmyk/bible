@@ -238,7 +238,7 @@ INSERT INTO storage.buckets (id, name, public) VALUES
   ('college-documents', 'college-documents', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Storage Public Read and Upload Policies
+-- Storage Public Read, Upload, Update & Delete Policies
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -250,6 +250,34 @@ BEGIN
     SELECT 1 FROM pg_policies WHERE policyname = 'Public Upload Storage' AND tablename = 'objects'
   ) THEN
     CREATE POLICY "Public Upload Storage" ON storage.objects FOR INSERT WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Public Update Storage' AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Public Update Storage" ON storage.objects FOR UPDATE USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Public Delete Storage' AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Public Delete Storage" ON storage.objects FOR DELETE USING (true);
+  END IF;
+END $$;
+
+-- 2B. MASTER REAL-TIME SYNC TABLE (Syncs all Admin Panel edits across all devices)
+CREATE TABLE IF NOT EXISTS public.college_sync_state (
+  id TEXT PRIMARY KEY,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.college_sync_state ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Public Access Sync State' AND tablename = 'college_sync_state'
+  ) THEN
+    CREATE POLICY "Public Access Sync State" ON public.college_sync_state FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
 
@@ -426,7 +454,7 @@ BEGIN
     CREATE POLICY "Public Read Courses" ON public.courses FOR SELECT USING (true);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public Modify Courses' AND tablename = 'courses') THEN
-    CREATE POLICY "Public Modify Courses" ON public.courses FOR ALL USING (true);
+    CREATE POLICY "Public Modify Courses" ON public.courses FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
   -- Faculty
@@ -434,7 +462,7 @@ BEGIN
     CREATE POLICY "Public Read Faculty" ON public.faculty FOR SELECT USING (true);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public Modify Faculty' AND tablename = 'faculty') THEN
-    CREATE POLICY "Public Modify Faculty" ON public.faculty FOR ALL USING (true);
+    CREATE POLICY "Public Modify Faculty" ON public.faculty FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
   -- Students
@@ -442,7 +470,7 @@ BEGIN
     CREATE POLICY "Public Read Students" ON public.students FOR SELECT USING (true);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public Modify Students' AND tablename = 'students') THEN
-    CREATE POLICY "Public Modify Students" ON public.students FOR ALL USING (true);
+    CREATE POLICY "Public Modify Students" ON public.students FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
   -- Subjects
@@ -450,7 +478,7 @@ BEGIN
     CREATE POLICY "Public Read Subjects" ON public.subjects FOR SELECT USING (true);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public Modify Subjects' AND tablename = 'subjects') THEN
-    CREATE POLICY "Public Modify Subjects" ON public.subjects FOR ALL USING (true);
+    CREATE POLICY "Public Modify Subjects" ON public.subjects FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
   -- Admissions
@@ -461,7 +489,7 @@ BEGIN
     CREATE POLICY "Public Insert Admissions" ON public.admissions FOR INSERT WITH CHECK (true);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public Update Admissions' AND tablename = 'admissions') THEN
-    CREATE POLICY "Public Update Admissions" ON public.admissions FOR UPDATE USING (true);
+    CREATE POLICY "Public Update Admissions" ON public.admissions FOR UPDATE USING (true) WITH CHECK (true);
   END IF;
 
   -- Notices
@@ -469,7 +497,7 @@ BEGIN
     CREATE POLICY "Public Read Notices" ON public.notices FOR SELECT USING (true);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public Modify Notices' AND tablename = 'notices') THEN
-    CREATE POLICY "Public Modify Notices" ON public.notices FOR ALL USING (true);
+    CREATE POLICY "Public Modify Notices" ON public.notices FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
   -- Events
@@ -477,7 +505,7 @@ BEGIN
     CREATE POLICY "Public Read Events" ON public.events FOR SELECT USING (true);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public Modify Events' AND tablename = 'events') THEN
-    CREATE POLICY "Public Modify Events" ON public.events FOR ALL USING (true);
+    CREATE POLICY "Public Modify Events" ON public.events FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
   -- Study Materials
@@ -485,7 +513,7 @@ BEGIN
     CREATE POLICY "Public Read Study Materials" ON public.study_materials FOR SELECT USING (true);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public Modify Study Materials' AND tablename = 'study_materials') THEN
-    CREATE POLICY "Public Modify Study Materials" ON public.study_materials FOR ALL USING (true);
+    CREATE POLICY "Public Modify Study Materials" ON public.study_materials FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
   -- Gallery
@@ -493,7 +521,7 @@ BEGIN
     CREATE POLICY "Public Read Gallery" ON public.gallery FOR SELECT USING (true);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public Modify Gallery' AND tablename = 'gallery') THEN
-    CREATE POLICY "Public Modify Gallery" ON public.gallery FOR ALL USING (true);
+    CREATE POLICY "Public Modify Gallery" ON public.gallery FOR ALL USING (true) WITH CHECK (true);
   END IF;
 
   -- Users
@@ -501,11 +529,11 @@ BEGIN
     CREATE POLICY "Public Read Users" ON public.users FOR SELECT USING (true);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public Modify Users' AND tablename = 'users') THEN
-    CREATE POLICY "Public Modify Users" ON public.users FOR ALL USING (true);
+    CREATE POLICY "Public Modify Users" ON public.users FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
 
--- 15. INITIAL SEED DATA (Pre-populates the College Database)
+-- 15. INITIAL SEED DATA (Pre-populates the College Database without overwriting existing edits)
 -- Courses
 INSERT INTO public.courses (id, course_code, course_name, level, duration, mode, language, description, eligibility, total_credits, annual_tuition, status)
 VALUES
@@ -513,22 +541,22 @@ VALUES
   ('mdiv', 'M.Div', 'Master of Divinity (M.Div)', 'Master', '3 Years (2 Years for B.Th Graduates)', 'Residential & Hybrid Modular', 'English (with Tamil tutorial support)', 'The premier professional master’s degree for pastoral and theological leadership. Equips students with high-level biblical exegesis in original languages, dogmatic theology, and leadership wisdom.', 'A recognized Bachelor’s Degree (B.A, B.Sc, B.Com, B.Tech, etc.) or a B.Th from a recognized Bible College.', 92, '₹36,000 / year (Hostel & Mess subsidized)', 'Active'),
   ('cert', 'CBS', 'Certificate in Biblical Studies (CBS)', 'Certificate', '1 Year (Evening & Weekend Modular)', 'Residential / Evening Classes', 'Tamil and English', 'Foundational biblical certification designed for Sunday school educators, youth directors, worship leaders, and lay elders.', 'Pass in 10th Standard / Matriculation. A passion for knowing God’s Word.', 32, '₹12,000 / year', 'Active'),
   ('short-greek', 'ST-02', 'Short Course: Biblical Greek for Preachers', 'Short Course', '6 Weeks (Evening Online / In-person)', 'Hybrid / Modular', 'English', 'Learn to read the Greek New Testament without fear. Understand verbal aspect, cases, prepositions, and key theological vocabulary.', 'Basic theological interest or current theological student.', 4, '₹3,500', 'Active')
-ON CONFLICT (id) DO UPDATE SET course_name = EXCLUDED.course_name;
+ON CONFLICT (id) DO NOTHING;
 
 -- Faculty
 INSERT INTO public.faculty (id, name, email, phone, designation, department, qualification, alma_mater, years_of_experience, bio, subjects, profile_image, quote, status)
 VALUES
-  ('fac-1', 'Pr. Christopher', 'principal@iocbc.edu.in', '+91 95004 23126', 'Principal & President', 'Theology & Pastoral Leadership', 'B.Th, B.D, M.Th (Theology), Ph.D (Theology)', 'United Theological College, Bangalore', 24, 'Pr. Christopher serves Image of Christ Bible College since 2020. Dedicated to the Great Commission and the John 17:18 mission.', ARRAY['Systematic Theology', 'Trinitarian Dogmatics', 'Pastoral Leadership'], 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80', '“We do not merely teach students information about Christ; we mentor them into the very image of Christ.”', 'Active'),
-  ('fac-2', 'Dr. Grace Joshua', 'dr.grace@iocbc.edu.in', '+91 94432 10022', 'Vice Principal & Professor of New Testament Studies', 'Biblical Languages & Exegesis', 'M.A (English), B.D, M.Th (New Testament), D.Th', 'South Asia Institute of Advanced Christian Studies (SAIACS)', 19, 'Dr. Grace Joshua is a renowned scholar of Johannine literature and Koine Greek.', ARRAY['Biblical Greek', 'Johannine Literature', 'Romans'], 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80', '“To read the New Testament in its original Greek is to sit at the feet of the Apostles.”', 'Active'),
-  ('fac-3', 'Rev. Dr. Samuel Jayakumar', 'dr.samuel@iocbc.edu.in', '+91 94432 10033', 'Academic Dean & Professor of Missions', 'Missiology & Church Planting', 'B.Sc, B.Th, M.Div, M.Th (Missions), Ph.D', 'Union Biblical Seminary, Pune', 22, 'Rev. Dr. Samuel Jayakumar directs the college practical ministry practicums and rural church planting.', ARRAY['Theology of Mission', 'Church Planting Strategies'], 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80', '“We train soldiers of the Cross for the harvest fields.”', 'Active')
-ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+  ('fac-1', 'Pr. Christopher', 'vellorebiblecollege5@gmail.com', '+91 95004 23126', 'Principal & President, ICBC Vellore', 'Theology & Pastoral Leadership', 'B.Sc, B.D, M.Th, Ph.D (Theological Studies)', 'Senate of Serampore / ATA Recognized Theological Institutions', 24, 'Serving the Lord across Vellore and Tamil Nadu for over two decades, Pr. Christopher founded Image of Christ Bible College with a burning burden to raise pastors, evangelists, and teachers who are deeply rooted in the Word of God and transformed into the likeness of Jesus Christ.', ARRAY['Systematic Theology', 'Christology', 'Pastoral Leadership & Homiletics', 'Church Planting'], '', '“Our supreme goal is not merely to fill minds with theological information, but to see men and women formed into the living image of Jesus Christ for sacrificial ministry.”', 'Active'),
+  ('fac-2', 'Dr. Grace Joshua', 'dr.grace@iocbc.edu.in', '+91 94432 10022', 'Vice Principal & Professor of New Testament Studies', 'Biblical Languages & Exegesis', 'M.A (English), B.D, M.Th (New Testament), D.Th', 'South Asia Institute of Advanced Christian Studies (SAIACS)', 19, 'Dr. Grace Joshua is a renowned scholar of Johannine literature and Koine Greek.', ARRAY['Biblical Greek', 'Johannine Literature', 'Romans'], '', '“To read the New Testament in its original Greek is to sit at the feet of the Apostles.”', 'Active'),
+  ('fac-3', 'Rev. Dr. Samuel Jayakumar', 'dr.samuel@iocbc.edu.in', '+91 94432 10033', 'Academic Dean & Professor of Missions', 'Missiology & Church Planting', 'B.Sc, B.Th, M.Div, M.Th (Missions), Ph.D', 'Union Biblical Seminary, Pune', 22, 'Rev. Dr. Samuel Jayakumar directs the college practical ministry practicums and rural church planting.', ARRAY['Theology of Mission', 'Church Planting Strategies'], '', '“We train soldiers of the Cross for the harvest fields.”', 'Active')
+ON CONFLICT (id) DO NOTHING;
 
 -- Students
 INSERT INTO public.students (id, student_id, full_name, email, phone, course_id, course_title, admission_year, batch, profile_image, attendance_percent, gpa, status)
 VALUES
-  ('std-2025-042', 'ICBC-2024-M08', 'Brother John Rajan', 'john.rajan@student.icbc.ac.in', '+91 98410 44521', 'mdiv', 'Master of Divinity (M.Div) - 2nd Year', 'Academic Year 2025–26 (Semester IV)', 'Batch of 2024–2027', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80', 92.4, '3.82 / 4.0', 'Active'),
-  ('std-2025-018', 'ICBC-2024-B12', 'Stephen Dhanraj', 'stephen.dhanraj@student.icbc.ac.in', '+91 97890 32145', 'bth', 'Bachelor of Theology (B.Th) - 2nd Year', 'Year 2 (Semester III)', 'Batch of 2024–2027', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80', 94.0, '3.75 / 4.0', 'Active')
-ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name;
+  ('std-2025-042', 'ICBC-2024-M08', 'Brother John Rajan', 'john.rajan@student.icbc.ac.in', '+91 98410 44521', 'mdiv', 'Master of Divinity (M.Div) - 2nd Year', 'Academic Year 2025–26 (Semester IV)', 'Batch of 2024–2027', '', 92.4, '3.82 / 4.0', 'Active'),
+  ('std-2025-018', 'ICBC-2024-B12', 'Stephen Dhanraj', 'stephen.dhanraj@student.icbc.ac.in', '+91 97890 32145', 'bth', 'Bachelor of Theology (B.Th) - 2nd Year', 'Year 2 (Semester III)', 'Batch of 2024–2027', '', 94.0, '3.75 / 4.0', 'Active')
+ON CONFLICT (id) DO NOTHING;
 
 -- Subjects
 INSERT INTO public.subjects (id, course_id, subject_code, subject_name, credits, semester_or_year, faculty_name)
@@ -538,19 +566,19 @@ VALUES
   ('sub-3', 'bth', 'TH-301', 'Systematic Theology I: God & Revelation', 3, 'Year 1 / Sem 2', 'Pr. Christopher'),
   ('sub-6', 'mdiv', 'GK-501', 'Biblical Greek: Syntax & Exegesis', 4, 'Year 1 / Sem 1', 'Dr. Grace Joshua'),
   ('sub-8', 'mdiv', 'ST-504', 'Systematic Theology: Soteriology & Eschatology', 4, 'Year 2 / Sem 3', 'Pr. Christopher')
-ON CONFLICT (id) DO UPDATE SET subject_name = EXCLUDED.subject_name;
+ON CONFLICT (id) DO NOTHING;
 
 -- Notices
 INSERT INTO public.notices (id, title, category, is_urgent, content, posted_by)
 VALUES
   ('not-1', 'Admissions for Academic Year 2026–2027 are Open', 'Admissions', true, 'Formal applications for B.Th, M.Div, and Certificate courses are now open. Hostel reservation is on a first-come basis.', 'Office of the Registrar'),
   ('not-2', 'Annual All-Night Intercessory Chapel Service', 'Chapel', false, 'All enrolled students, resident scholars, and visiting pastors are invited to the Chapel on Friday from 9:00 PM to 4:30 AM.', 'Dean of Chapel')
-ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title;
+ON CONFLICT (id) DO NOTHING;
 
 -- Users
 INSERT INTO public.users (id, email, full_name, role, avatar_url, student_id, faculty_id)
 VALUES
-  ('11111111-1111-1111-1111-111111111111', 'admin@iocbc.edu.in', 'Pr. Christopher', 'super_admin', 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80', NULL, 'fac-1'),
-  ('44444444-4444-4444-4444-444444444444', 'john.rajan@student.icbc.ac.in', 'Brother John Rajan', 'student', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80', 'ICBC-2024-M08', NULL)
-ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role;
+  ('11111111-1111-1111-1111-111111111111', 'admin@iocbc.edu.in', 'Pr. Christopher', 'super_admin', '', NULL, 'fac-1'),
+  ('44444444-4444-4444-4444-444444444444', 'john.rajan@student.icbc.ac.in', 'Brother John Rajan', 'student', '', 'ICBC-2024-M08', NULL)
+ON CONFLICT (email) DO NOTHING;
 `;

@@ -824,7 +824,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Faculty management
   const addFaculty = async (member: Omit<FacultyMember, 'id'>) => {
     const id = `fac-${Date.now()}`;
-    const newMember: FacultyMember = { ...member, id };
+    const newMember: FacultyMember = { ...member, id, _updatedAt: Date.now() };
     setFaculty(prev => {
       const next = [newMember, ...prev];
       pushToSupabaseBackend({ faculty: next });
@@ -833,9 +833,11 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const client = getSupabaseClient();
     if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
-        await client.from('faculty').insert({
+        await client.from('faculty').upsert({
           id,
           name: newMember.name,
+          email: newMember.email || 'icbc.vellore@gmail.com',
+          phone: newMember.phone || '+91 95004 23126',
           designation: newMember.role,
           department: newMember.department,
           qualification: newMember.degrees,
@@ -854,26 +856,40 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateFaculty = async (id: string, updates: Partial<FacultyMember>) => {
+    const stampedUpdates: Partial<FacultyMember> = { ...updates, _updatedAt: Date.now() };
+    let updatedMember: FacultyMember | null = null;
     setFaculty(prev => {
-      const next = prev.map(f => (f.id === id ? { ...f, ...updates } : f));
+      const next = prev.map(f => {
+        if (f.id === id) {
+          updatedMember = { ...f, ...stampedUpdates };
+          return updatedMember;
+        }
+        return f;
+      });
       pushToSupabaseBackend({ faculty: next });
       return next;
     });
     const client = getSupabaseClient();
     if (client && isExternalSupabaseUrl(getSavedSupabaseConfig().url)) {
       try {
-        await client.from('faculty').update({
-          ...(updates.name ? { name: updates.name } : {}),
-          ...(updates.role ? { designation: updates.role } : {}),
-          ...(updates.department ? { department: updates.department } : {}),
-          ...(updates.degrees ? { qualification: updates.degrees } : {}),
-          ...(updates.almaMater ? { alma_mater: updates.almaMater } : {}),
-          ...(updates.yearsOfExperience !== undefined ? { years_of_experience: updates.yearsOfExperience } : {}),
-          ...(updates.bio ? { bio: updates.bio } : {}),
-          ...(updates.subjects ? { subjects: updates.subjects } : {}),
-          ...(updates.photo ? { profile_image: updates.photo } : {}),
-          ...(updates.quote !== undefined ? { quote: updates.quote } : {})
-        }).eq('id', id);
+        const current = liveStateRef.current.faculty.find(f => f.id === id) || INITIAL_FACULTY[0];
+        const target: FacultyMember = updatedMember || { ...current, ...stampedUpdates, id };
+        await client.from('faculty').upsert({
+          id: target.id,
+          name: target.name,
+          email: target.email || 'icbc.vellore@gmail.com',
+          phone: target.phone || '+91 95004 23126',
+          designation: target.role,
+          department: target.department,
+          qualification: target.degrees,
+          alma_mater: target.almaMater,
+          years_of_experience: target.yearsOfExperience,
+          bio: target.bio,
+          subjects: target.subjects,
+          profile_image: target.photo,
+          quote: target.quote || '',
+          status: 'Active'
+        });
       } catch (e) {
         console.warn('Failed to update faculty in Supabase:', e);
       }
@@ -933,8 +949,9 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateStudent = async (id: string, updates: Partial<StudentProfile>) => {
+    const stamped = { ...updates, _updatedAt: Date.now() } as any;
     setStudentsList(prev => {
-      const next = prev.map(s => (s.id === id ? { ...s, ...updates } : s));
+      const next = prev.map(s => (s.id === id ? { ...s, ...stamped } : s));
       pushToSupabaseBackend({ students: next });
       return next;
     });
@@ -1006,8 +1023,9 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateSubject = async (id: string, updates: Partial<SubjectItem>) => {
+    const stamped = { ...updates, _updatedAt: Date.now() } as any;
     setSubjectsList(prev => {
-      const next = prev.map(s => (s.id === id ? { ...s, ...updates } : s));
+      const next = prev.map(s => (s.id === id ? { ...s, ...stamped } : s));
       pushToSupabaseBackend({ subjects: next });
       return next;
     });
@@ -1045,7 +1063,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Merge helper: always uses liveStateRef.current (never stale closures!) and preserves local uploads/items
+  // Merge helper: always uses liveStateRef.current (never stale closures!) and preserves local uploads & edits
   const mergeByIdHelper = <T extends { id: string }>(
     localArr: T[],
     remoteArr: T[] | undefined
@@ -1055,12 +1073,28 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return { merged: cleanLocal, extraLocal: [], localHasExtra: false };
     }
     const cleanRemote = remoteArr.filter(item => item && item.id && !deletedIdsRef.current.has(item.id));
+    const localMap = new Map(cleanLocal.map(item => [item.id, item]));
     const remoteIds = new Set(cleanRemote.map(item => item.id));
-    const extraLocal = cleanLocal.filter(item => !remoteIds.has(item.id));
+    const extraLocal: T[] = cleanLocal.filter(item => !remoteIds.has(item.id));
+
+    const mergedRemote = cleanRemote.map(remoteItem => {
+      const localItem = localMap.get(remoteItem.id);
+      if (localItem) {
+        const localTs = Number((localItem as any)._updatedAt || 0);
+        const remoteTs = Number((remoteItem as any)._updatedAt || 0);
+        if (localTs > remoteTs) {
+          extraLocal.push(localItem);
+          return localItem;
+        }
+      }
+      return remoteItem;
+    });
+
     if (extraLocal.length > 0) {
-      return { merged: [...extraLocal, ...cleanRemote], extraLocal, localHasExtra: true };
+      const newOnly = cleanLocal.filter(item => !remoteIds.has(item.id));
+      return { merged: [...newOnly, ...mergedRemote], extraLocal, localHasExtra: true };
     }
-    return { merged: cleanRemote, extraLocal: [], localHasExtra: false };
+    return { merged: mergedRemote, extraLocal: [], localHasExtra: false };
   };
 
   const mergeAndSyncInitialState = (serverState: any) => {
@@ -1240,7 +1274,9 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
           bio: f.bio || '',
           subjects: Array.isArray(f.subjects) ? f.subjects : [],
           photo: f.profile_image || '',
-          quote: f.quote || ''
+          quote: f.quote || '',
+          phone: f.phone || '+91 95004 23126',
+          email: f.email || 'icbc.vellore@gmail.com'
         }));
         const mergedFac = mergeByIdHelper(live.faculty, remoteFac);
         if (mergedFac.merged.length > 0) setFaculty(mergedFac.merged);
@@ -1249,6 +1285,8 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
             mergedFac.extraLocal.map(f => ({
               id: f.id,
               name: f.name,
+              email: f.email || 'icbc.vellore@gmail.com',
+              phone: f.phone || '+91 95004 23126',
               designation: f.role,
               department: f.department,
               qualification: f.degrees,
@@ -1814,8 +1852,9 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateStudyMaterial = async (id: string, updates: Partial<StudyMaterial>) => {
+    const stamped = { ...updates, _updatedAt: Date.now() } as any;
     setStudyMaterials(prev => {
-      const next = prev.map(m => (m.id === id ? { ...m, ...updates } : m));
+      const next = prev.map(m => (m.id === id ? { ...m, ...stamped } : m));
       pushToSupabaseBackend({ study_materials: next });
       return next;
     });
@@ -1889,8 +1928,9 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateNotice = async (id: string, updates: Partial<Notice>) => {
+    const stamped = { ...updates, _updatedAt: Date.now() } as any;
     setNotices(prev => {
-      const next = prev.map(n => (n.id === id ? { ...n, ...updates } : n));
+      const next = prev.map(n => (n.id === id ? { ...n, ...stamped } : n));
       pushToSupabaseBackend({ notices: next });
       return next;
     });
@@ -1959,8 +1999,9 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateEvent = async (id: string, updates: Partial<EventItem>) => {
+    const stamped = { ...updates, _updatedAt: Date.now() } as any;
     setEvents(prev => {
-      const next = prev.map(ev => (ev.id === id ? { ...ev, ...updates } : ev));
+      const next = prev.map(ev => (ev.id === id ? { ...ev, ...stamped } : ev));
       pushToSupabaseBackend({ events: next });
       return next;
     });
@@ -2029,8 +2070,9 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateGalleryPhoto = async (id: string, updates: Partial<GalleryPhoto>) => {
+    const stamped = { ...updates, _updatedAt: Date.now() } as any;
     setGallery(prev => {
-      const next = prev.map(g => (g.id === id ? { ...g, ...updates } : g));
+      const next = prev.map(g => (g.id === id ? { ...g, ...stamped } : g));
       pushToSupabaseBackend({ gallery: next });
       return next;
     });
@@ -2097,8 +2139,9 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateCourse = async (id: string, updates: Partial<Course>) => {
+    const stamped = { ...updates, _updatedAt: Date.now() } as any;
     setCourses(prev => {
-      const next = prev.map(c => (c.id === id ? { ...c, ...updates } : c));
+      const next = prev.map(c => (c.id === id ? { ...c, ...stamped } : c));
       pushToSupabaseBackend({ courses: next });
       return next;
     });

@@ -35,6 +35,7 @@ export const StudentsView: React.FC = () => {
     loginStudent,
     logoutStudent,
     studentsList,
+    faculty,
     studyMaterials,
     notices,
     subjectsList,
@@ -1076,7 +1077,7 @@ export const StudentsView: React.FC = () => {
               </div>
 
               <div className="pt-3 border-t border-white/10 text-[10px] text-slate-300 flex items-center justify-between">
-                <span>Principal: Pr. Christopher</span>
+                <span>Principal: {(faculty.find(f => f.id === 'fac-1') || faculty[0])?.name || 'Pr. Christopher'}</span>
                 <span className="text-emerald-400 font-bold">ACTIVE BONAFIDE</span>
               </div>
             </div>

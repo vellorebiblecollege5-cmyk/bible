@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useCollege } from '../context/CollegeContext';
 import { FacultyMember } from '../types';
+import { INITIAL_FACULTY } from '../data/collegeData';
 import {
   GraduationCap,
   BookOpen,
@@ -16,6 +17,7 @@ import officialLogo from '../assets/images/icbc_official_logo_1790324060325.jpg'
 export const FacultyView: React.FC = () => {
   const { faculty } = useCollege();
   const [selectedFaculty, setSelectedFaculty] = useState<FacultyMember | null>(null);
+  const principal = faculty.find(f => f.id === 'fac-1') || faculty[0] || INITIAL_FACULTY[0];
 
   return (
     <div className="space-y-12 pb-16 font-sans">
@@ -91,13 +93,13 @@ export const FacultyView: React.FC = () => {
 
                 {/* Direct Contact */}
                 <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs font-semibold text-[#0f2444]">
-                  <a href="tel:+919500423126" className="flex items-center hover:text-amber-700">
+                  <a href={`tel:${(member.phone || '+919500423126').replace(/\s+/g, '')}`} className="flex items-center hover:text-amber-700">
                     <Phone className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                    <span>ph. 95004 23126</span>
+                    <span>ph. {member.phone || '95004 23126'}</span>
                   </a>
-                  <a href="mailto:icbc.vellore@gmail.com" className="flex items-center hover:text-amber-700">
+                  <a href={`mailto:${member.email || 'icbc.vellore@gmail.com'}`} className="flex items-center hover:text-amber-700">
                     <Mail className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                    <span>icbc.vellore@gmail.com</span>
+                    <span>{member.email || 'icbc.vellore@gmail.com'}</span>
                   </a>
                 </div>
               </div>
@@ -142,7 +144,7 @@ export const FacultyView: React.FC = () => {
               Biblical Mentorship at Image of Christ Bible College
             </h4>
             <p>
-              Under the leadership of Pr. Christopher, theological education at ICBC is intentionally focused on character, scriptural inerrancy, and practical church ministry. Our students are mentored through personal discipleship, prayer, and hands-on mission outreach.
+              Under the leadership of {principal.name} ({principal.role}), theological education at ICBC is intentionally focused on character, scriptural inerrancy, and practical church ministry. Our students are mentored through personal discipleship, prayer, and hands-on mission outreach.
             </p>
           </div>
         </div>

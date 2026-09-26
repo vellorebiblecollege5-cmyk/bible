@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCollege, ActivePage } from '../context/CollegeContext';
-import { COLLEGE_INFO, COLLEGE_JOURNEY, DOCTRINAL_ARTICLES } from '../data/collegeData';
+import { COLLEGE_INFO, COLLEGE_JOURNEY, DOCTRINAL_ARTICLES, INITIAL_FACULTY } from '../data/collegeData';
 import {
   Compass,
   History,
@@ -22,6 +22,7 @@ import classroomPhoto from '../assets/images/icbc_classroom_1790324037922.jpg';
 
 export const AboutView: React.FC = () => {
   const { activePage, setActivePage, faculty } = useCollege();
+  const principal = faculty.find(f => f.id === 'fac-1') || faculty[0] || INITIAL_FACULTY[0];
   
   // Determine sub-tab from context or default
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'vision' | 'leadership' | 'faith'>('overview');
@@ -208,7 +209,7 @@ export const AboutView: React.FC = () => {
                   <ChevronRight className="w-4 h-4 text-stone-400 group-hover:translate-x-1 transition-transform" />
                 </h4>
                 <p className="text-xs text-stone-600 mt-2">
-                  Meet Pr. Christopher (Principal & President, ICBC Vellore).
+                  Meet {principal.name} ({principal.role}).
                 </p>
               </div>
             </div>
@@ -387,7 +388,7 @@ export const AboutView: React.FC = () => {
 
             <div className="max-w-4xl mx-auto space-y-6">
               {faculty.map(member => (
-                <div key={member.id} className="bg-white rounded-3xl border border-stone-200 p-8 shadow-sm">
+                <div key={member.id} className="bg-white rounded-3xl border border-stone-200 p-8 shadow-sm space-y-5">
                   <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
                     <div className="w-28 h-28 rounded-full overflow-hidden border-3 border-amber-500 flex-shrink-0 shadow-md bg-white p-1">
                       <img
@@ -404,6 +405,11 @@ export const AboutView: React.FC = () => {
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900">
                           {member.department}
                         </span>
+                        {member.yearsOfExperience > 0 && (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-900 border border-blue-200">
+                            {member.yearsOfExperience}+ Years Experience
+                          </span>
+                        )}
                         {member.degrees && (
                           <span className="text-xs text-stone-500 font-semibold">
                             • {member.degrees}
@@ -416,21 +422,47 @@ export const AboutView: React.FC = () => {
                       <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">
                         {member.role}
                       </p>
+                      {member.almaMater && (
+                        <p className="text-xs text-stone-500">
+                          Alma Mater: {member.almaMater}
+                        </p>
+                      )}
                       <p className="text-xs text-stone-600 leading-relaxed">
                         {member.bio}
                       </p>
                       <div className="pt-2 flex flex-wrap justify-center sm:justify-start gap-4 text-xs font-semibold text-[#0f2444]">
-                        <a href="tel:+919500423126" className="flex items-center hover:text-amber-700">
+                        <a href={`tel:${(member.phone || '+919500423126').replace(/\s+/g, '')}`} className="flex items-center hover:text-amber-700">
                           <Phone className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                          <span>ph. 95004 23126</span>
+                          <span>ph. {member.phone || '95004 23126'}</span>
                         </a>
-                        <a href="mailto:icbc.vellore@gmail.com" className="flex items-center hover:text-amber-700">
+                        <a href={`mailto:${member.email || 'icbc.vellore@gmail.com'}`} className="flex items-center hover:text-amber-700">
                           <Mail className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                          <span>icbc.vellore@gmail.com</span>
+                          <span>{member.email || 'icbc.vellore@gmail.com'}</span>
                         </a>
                       </div>
                     </div>
                   </div>
+                  {(member.subjects?.length > 0 || member.quote) && (
+                    <div className="pt-4 border-t border-stone-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {member.subjects?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          {member.subjects.map((sub, sIdx) => (
+                            <span
+                              key={sIdx}
+                              className="px-2.5 py-1 rounded-lg bg-[#faf8f5] border border-stone-200 text-stone-800 text-[11px] font-medium"
+                            >
+                              {sub}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {member.quote && (
+                        <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 text-xs italic font-serif text-amber-950">
+                          {member.quote}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

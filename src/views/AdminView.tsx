@@ -24,6 +24,8 @@ import {
   COMPLETE_SUPABASE_SCHEMA_SQL,
   ALL_STORAGE_BUCKETS
 } from '../lib/supabase';
+import { INITIAL_FACULTY } from '../data/collegeData';
+import officialLogo from '../assets/images/icbc_official_logo_1790324060325.jpg';
 import {
   Shield,
   Lock,
@@ -256,7 +258,11 @@ export const AdminView: React.FC = () => {
   const [facSubjects, setFacSubjects] = useState('Systematic Theology, Homiletics');
   const [facBio, setFacBio] = useState('');
   const [facQuote, setFacQuote] = useState('');
-  const [facPhoto, setFacPhoto] = useState('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80');
+  const [facPhone, setFacPhone] = useState('+91 95004 23126');
+  const [facEmail, setFacEmail] = useState('icbc.vellore@gmail.com');
+  const [facPhoto, setFacPhoto] = useState('');
+
+  const principalProfile = faculty.find(f => f.id === 'fac-1') || faculty[0] || INITIAL_FACULTY[0];
 
   // Course modal / state (Add & Edit)
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -761,7 +767,9 @@ export const AdminView: React.FC = () => {
     setFacSubjects('Systematic Theology, Homiletics');
     setFacBio('');
     setFacQuote('');
-    setFacPhoto('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80');
+    setFacPhone('+91 95004 23126');
+    setFacEmail('icbc.vellore@gmail.com');
+    setFacPhoto('');
     setShowFacultyModal(true);
   };
 
@@ -776,11 +784,13 @@ export const AdminView: React.FC = () => {
     setFacSubjects(f.subjects.join(', '));
     setFacBio(f.bio);
     setFacQuote(f.quote || '');
-    setFacPhoto(f.photo);
+    setFacPhone(f.phone || '+91 95004 23126');
+    setFacEmail(f.email || 'icbc.vellore@gmail.com');
+    setFacPhoto(f.photo || '');
     setShowFacultyModal(true);
   };
 
-  const handleSaveFaculty = (e: React.FormEvent) => {
+  const handleSaveFaculty = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!facName.trim()) {
       showToast('error', 'Please enter faculty member name.');
@@ -792,33 +802,37 @@ export const AdminView: React.FC = () => {
       .filter(Boolean);
 
     if (editingFacultyId) {
-      updateFaculty(editingFacultyId, {
-        name: facName,
-        role: facRole,
-        department: facDept,
-        degrees: facDegrees,
-        almaMater: facAlmaMater,
+      await updateFaculty(editingFacultyId, {
+        name: facName.trim(),
+        role: facRole.trim(),
+        department: facDept.trim(),
+        degrees: facDegrees.trim(),
+        almaMater: facAlmaMater.trim(),
         yearsOfExperience: Number(facExp) || 5,
         subjects: subjectsArr,
-        bio: facBio,
-        quote: facQuote,
-        photo: facPhoto
+        bio: facBio.trim(),
+        quote: facQuote.trim(),
+        phone: facPhone.trim() || '+91 95004 23126',
+        email: facEmail.trim() || 'icbc.vellore@gmail.com',
+        photo: facPhoto.trim()
       });
-      showToast('success', `Faculty profile for ${facName} updated.`);
+      showToast('success', `Profile for ${facName} saved to Supabase & updated across the live website!`);
     } else {
-      addFaculty({
-        name: facName,
-        role: facRole,
-        department: facDept,
-        degrees: facDegrees,
-        almaMater: facAlmaMater,
+      await addFaculty({
+        name: facName.trim(),
+        role: facRole.trim(),
+        department: facDept.trim(),
+        degrees: facDegrees.trim(),
+        almaMater: facAlmaMater.trim(),
         yearsOfExperience: Number(facExp) || 5,
         subjects: subjectsArr.length ? subjectsArr : ['Biblical Studies'],
-        bio: facBio || 'Dedicated faculty member equipping servant leaders through the Word of God.',
-        quote: facQuote || 'Equipping lives for the Great Commission.',
-        photo: facPhoto || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80'
+        bio: facBio.trim() || 'Dedicated faculty member equipping servant leaders through the Word of God.',
+        quote: facQuote.trim() || 'Equipping lives for the Great Commission.',
+        phone: facPhone.trim() || '+91 95004 23126',
+        email: facEmail.trim() || 'icbc.vellore@gmail.com',
+        photo: facPhoto.trim()
       });
-      showToast('success', `Added ${facName} to Faculty directory.`);
+      showToast('success', `Added ${facName} to Faculty directory & saved to Supabase!`);
     }
     setShowFacultyModal(false);
     setEditingFacultyId(null);
@@ -1130,7 +1144,7 @@ export const AdminView: React.FC = () => {
           } else if (selectedBucket === 'college-documents') {
             await addDownload({
               title: formattedTitle,
-              category: 'Academic',
+              category: 'Institutional',
               format: file.name.toLowerCase().endsWith('.docx') ? 'DOCX' : 'PDF',
               fileSize: sizeStr,
               description: `${formattedTitle} — Official College Document.`
@@ -1423,7 +1437,19 @@ export const AdminView: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Quick Edit Principal (Pr. Christopher) Button */}
+              <button
+                onClick={() => {
+                  setAdminTab('faculty');
+                  openEditFacultyModal(principalProfile);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold flex items-center space-x-1.5 transition-all shadow cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit {principalProfile.name} (Principal)</span>
+              </button>
+
               {/* Database quick status pill */}
               <div
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center border ${
@@ -1438,7 +1464,7 @@ export const AdminView: React.FC = () => {
 
               <button
                 onClick={() => logout()}
-                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors border border-white/10"
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors border border-white/10 cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Sign Out</span>
@@ -1478,14 +1504,14 @@ export const AdminView: React.FC = () => {
 
           <button
             onClick={() => setAdminTab('faculty')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center whitespace-nowrap cursor-pointer ${
               adminTab === 'faculty'
                 ? 'bg-blue-900 text-amber-300 shadow'
                 : 'text-stone-600 hover:text-slate-900 hover:bg-stone-100'
             }`}
           >
             <Shield className="w-3.5 h-3.5 mr-1.5" />
-            <span>Faculty ({faculty.length})</span>
+            <span>Principal & Faculty ({faculty.length})</span>
           </button>
 
           <button
@@ -1855,22 +1881,85 @@ export const AdminView: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 3: FACULTY */}
+        {/* TAB 3: FACULTY & PRINCIPAL */}
         {adminTab === 'faculty' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            {/* Highlighted Principal & President Quick-Edit Card */}
+            <div className="bg-gradient-to-r from-[#0f2444] via-slate-900 to-blue-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-amber-500/40 flex flex-col lg:flex-row items-center justify-between gap-6">
+              <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+                <div className="w-24 h-24 rounded-full overflow-hidden border-3 border-amber-400 bg-white p-1 shrink-0 shadow-lg">
+                  <img
+                    src={principalProfile.photo || officialLogo}
+                    onError={e => {
+                      (e.currentTarget as HTMLImageElement).src = officialLogo;
+                    }}
+                    alt={principalProfile.name}
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                </div>
+                <div className="space-y-1.5 max-w-2xl">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-amber-500/20 text-amber-300 border border-amber-400/30 inline-block">
+                    Principal & President Profile (Live on Home, About & Faculty Pages)
+                  </span>
+                  <h3 className="font-cinzel text-2xl font-extrabold text-white">
+                    {principalProfile.name}
+                  </h3>
+                  <p className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                    {principalProfile.role} • {principalProfile.degrees}
+                  </p>
+                  <p className="text-xs text-slate-300 line-clamp-2">
+                    {principalProfile.bio}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-3 shrink-0">
+                <label className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-amber-300 border border-amber-400/40 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 cursor-pointer transition-all">
+                  <UploadCloud className="w-4 h-4" />
+                  <span>{isUploading ? 'Uploading...' : 'Change Photo'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async e => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setIsUploading(true);
+                        const res = await uploadFileToStorage('faculty-photos', f);
+                        setIsUploading(false);
+                        if (res.url) {
+                          await updateFaculty(principalProfile.id, { photo: res.url });
+                          showToast('success', `${principalProfile.name}'s photo updated & published to live website!`);
+                        }
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+
+                <button
+                  onClick={() => openEditFacultyModal(principalProfile)}
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold uppercase tracking-wider flex items-center space-x-1.5 shadow-lg cursor-pointer transition-all"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  <span>Edit {principalProfile.name} Details</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="font-cinzel text-xl font-bold text-slate-900">Theological Faculty Registry</h3>
+                <h3 className="font-cinzel text-xl font-bold text-slate-900">Theological Faculty & Leadership Registry</h3>
                 <p className="text-xs text-stone-500">
-                  Add, edit, and delete professors, deans, and ministry lecturers.
+                  Edit {principalProfile.name} or add, edit, and manage professors, deans, and ministry lecturers.
                 </p>
               </div>
               <button
                 onClick={openAddFacultyModal}
-                className="px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 shadow cursor-pointer self-start sm:self-auto"
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Faculty</span>
+                <span>Add Faculty Member</span>
               </button>
             </div>
 
@@ -1880,9 +1969,12 @@ export const AdminView: React.FC = () => {
                   <div className="space-y-4">
                     <div className="flex items-center space-x-4">
                       <img
-                        src={f.photo}
+                        src={f.photo || officialLogo}
+                        onError={e => {
+                          (e.currentTarget as HTMLImageElement).src = officialLogo;
+                        }}
                         alt={f.name}
-                        className="w-14 h-14 rounded-2xl object-cover border-2 border-stone-200 shadow-sm shrink-0"
+                        className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-500/40 shadow-sm shrink-0 bg-white p-0.5"
                       />
                       <div>
                         <h4 className="font-cinzel font-bold text-slate-900 text-base">{f.name}</h4>
@@ -1895,7 +1987,13 @@ export const AdminView: React.FC = () => {
                       <div><strong>Degrees:</strong> {f.degrees}</div>
                       <div><strong>Alma Mater:</strong> {f.almaMater}</div>
                       <div><strong>Experience:</strong> {f.yearsOfExperience} Years</div>
+                      {f.phone && <div><strong>Phone:</strong> {f.phone}</div>}
+                      {f.email && <div><strong>Email:</strong> {f.email}</div>}
                     </div>
+
+                    {f.bio && (
+                      <p className="text-xs text-stone-600 line-clamp-3">{f.bio}</p>
+                    )}
 
                     <div className="flex flex-wrap gap-1">
                       {f.subjects.map((sub, i) => (
@@ -4210,14 +4308,19 @@ export const AdminView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: ADD / EDIT FACULTY */}
+      {/* MODAL: ADD / EDIT FACULTY & PRINCIPAL */}
       {showFacultyModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <h3 className="font-cinzel text-xl font-bold text-slate-900">
-                {editingFacultyId ? 'Edit Faculty Member' : 'Add Faculty Member'}
-              </h3>
+              <div>
+                <span className="text-[10px] uppercase tracking-widest text-amber-700 font-bold block">
+                  {editingFacultyId === 'fac-1' ? 'Principal & President Profile' : 'College Leadership & Faculty'}
+                </span>
+                <h3 className="font-cinzel text-xl font-bold text-slate-900">
+                  {editingFacultyId ? `Edit ${facName || 'Profile'}` : 'Add Faculty Member'}
+                </h3>
+              </div>
               <button
                 onClick={() => setShowFacultyModal(false)}
                 className="text-stone-400 hover:text-stone-600 font-bold cursor-pointer"
@@ -4227,7 +4330,64 @@ export const AdminView: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveFaculty} className="space-y-3.5 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              {/* Photo Preview & Upload */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
+                <img
+                  src={facPhoto || officialLogo}
+                  onError={e => {
+                    (e.currentTarget as HTMLImageElement).src = officialLogo;
+                  }}
+                  alt={facName || 'Faculty'}
+                  className="w-18 h-18 rounded-full object-cover border-2 border-amber-500 bg-white p-0.5 shrink-0 shadow"
+                />
+                <div className="space-y-2 flex-1 w-full">
+                  <label className="block font-bold text-slate-700 uppercase">
+                    Profile Photo (Upload from Computer/Phone or Paste URL)
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <label className="px-3 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold text-[11px] inline-flex items-center space-x-1.5 cursor-pointer shrink-0 shadow-xs">
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      <span>{isUploading ? 'Uploading...' : 'Choose Photo from Device'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async e => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            setIsUploading(true);
+                            const res = await uploadFileToStorage('faculty-photos', f);
+                            setIsUploading(false);
+                            if (res.url) {
+                              setFacPhoto(res.url);
+                              showToast('success', 'Photo uploaded! Click Save Changes below to publish.');
+                            }
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {facPhoto && (
+                      <button
+                        type="button"
+                        onClick={() => setFacPhoto('')}
+                        className="px-3 py-2 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-700 font-semibold text-[11px] cursor-pointer"
+                      >
+                        Use Official College Seal
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={facPhoto}
+                    onChange={e => setFacPhoto(e.target.value)}
+                    placeholder="Or paste direct image URL (leave blank for Official College Seal)"
+                    className="w-full px-3 py-1.5 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 uppercase mb-1">Full Name *</label>
                   <input
@@ -4235,40 +4395,63 @@ export const AdminView: React.FC = () => {
                     required
                     value={facName}
                     onChange={e => setFacName(e.target.value)}
-                    placeholder="e.g. Rev. Dr. Thomas Paul"
+                    placeholder="e.g. Pr. Christopher"
                     className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Role / Title *</label>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Role / Official Title *</label>
                   <input
                     type="text"
                     required
                     value={facRole}
                     onChange={e => setFacRole(e.target.value)}
-                    placeholder="Professor of Theology"
+                    placeholder="e.g. Principal & President, ICBC Vellore"
                     className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Department</label>
-                <input
-                  type="text"
-                  value={facDept}
-                  onChange={e => setFacDept(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Department</label>
+                  <input
+                    type="text"
+                    value={facDept}
+                    onChange={e => setFacDept(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Contact Phone</label>
+                  <input
+                    type="text"
+                    value={facPhone}
+                    onChange={e => setFacPhone(e.target.value)}
+                    placeholder="+91 95004 23126"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Official Email</label>
+                  <input
+                    type="email"
+                    value={facEmail}
+                    onChange={e => setFacEmail(e.target.value)}
+                    placeholder="icbc.vellore@gmail.com"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Degrees</label>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Degrees / Qualifications</label>
                   <input
                     type="text"
                     value={facDegrees}
                     onChange={e => setFacDegrees(e.target.value)}
+                    placeholder="B.Sc, B.D, M.Th, Ph.D"
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                   />
                 </div>
@@ -4304,45 +4487,23 @@ export const AdminView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Faculty Photo (Upload or URL)</label>
-                <div className="flex gap-2">
-                  <label className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-950 border border-blue-200 font-bold text-[11px] inline-flex items-center space-x-1.5 cursor-pointer shrink-0">
-                    <UploadCloud className="w-3.5 h-3.5 text-blue-900" />
-                    <span>{isUploading ? 'Uploading...' : 'Upload Photo'}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async e => {
-                        const f = e.target.files?.[0];
-                        if (f) {
-                          setIsUploading(true);
-                          const res = await uploadFileToStorage('faculty-photos', f);
-                          setIsUploading(false);
-                          if (res.url) {
-                            setFacPhoto(res.url);
-                            showToast('success', 'Faculty photo uploaded!');
-                          }
-                        }
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
-                  <input
-                    type="text"
-                    value={facPhoto}
-                    onChange={e => setFacPhoto(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Biography</label>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Biography / Leadership Message</label>
                 <textarea
                   rows={3}
                   value={facBio}
                   onChange={e => setFacBio(e.target.value)}
+                  placeholder="Full biography and leadership profile shown on Home, About, and Faculty pages..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">Principal / Vision Quote</label>
+                <textarea
+                  rows={2}
+                  value={facQuote}
+                  onChange={e => setFacQuote(e.target.value)}
+                  placeholder="Inspirational quote displayed on the Home page Principal card and Faculty page..."
                   className="w-full px-3.5 py-2 rounded-xl border border-stone-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900"
                 />
               </div>
@@ -4359,7 +4520,7 @@ export const AdminView: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-bold uppercase tracking-wider shadow cursor-pointer"
                 >
-                  {editingFacultyId ? 'Update Faculty' : 'Save Faculty'}
+                  {editingFacultyId ? 'Save & Publish Changes' : 'Save Faculty'}
                 </button>
               </div>
             </form>

@@ -30,6 +30,9 @@ export interface FacultyMember {
   subjects: string[];
   photo: string;
   quote?: string;
+  phone?: string;
+  email?: string;
+  _updatedAt?: number;
 }
 
 export interface StudentProfile {
