@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 import heroBanner from '../assets/images/icbc_campus_building_1790394522586.jpg';
-import officialLogo from '../assets/images/icbc_official_logo_1790324060325.jpg';
+import officialLogo from '../assets/images/icbc_vellore_official_logo_1790438854633.jpg';
 import graduationPhoto from '../assets/images/icbc_graduation_1790324006996.jpg';
 import classroomPhoto from '../assets/images/icbc_classroom_1790324037922.jpg';
 
@@ -36,7 +36,8 @@ export const HomeView: React.FC = () => {
     notices,
     events,
     gallery,
-    setSelectedCourseForApply
+    setSelectedCourseForApply,
+    collegeLogo
   } = useCollege();
 
   const principal = faculty.find(f => f.id === 'fac-1') || faculty[0] || INITIAL_FACULTY[0];
@@ -598,9 +599,10 @@ export const HomeView: React.FC = () => {
                 {/* Principal Photo or Official College Crest Seal */}
                 <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-amber-500 via-blue-900 to-amber-400 shadow-lg">
                   <img
-                    src={principal.photo || officialLogo}
+                    src={principal.photo || collegeLogo || officialLogo}
+                    referrerPolicy="no-referrer"
                     onError={e => {
-                      (e.currentTarget as HTMLImageElement).src = officialLogo;
+                      (e.currentTarget as HTMLImageElement).src = collegeLogo || officialLogo;
                     }}
                     alt={principal.name}
                     className="w-full h-full object-cover rounded-full bg-white"

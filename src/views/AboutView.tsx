@@ -16,12 +16,12 @@ import {
   GraduationCap
 } from 'lucide-react';
 
-import officialLogo from '../assets/images/icbc_official_logo_1790324060325.jpg';
+import officialLogo from '../assets/images/icbc_vellore_official_logo_1790438854633.jpg';
 import graduationPhoto from '../assets/images/icbc_graduation_1790324006996.jpg';
 import classroomPhoto from '../assets/images/icbc_classroom_1790324037922.jpg';
 
 export const AboutView: React.FC = () => {
-  const { activePage, setActivePage, faculty } = useCollege();
+  const { activePage, setActivePage, faculty, collegeLogo } = useCollege();
   const principal = faculty.find(f => f.id === 'fac-1') || faculty[0] || INITIAL_FACULTY[0];
   
   // Determine sub-tab from context or default
@@ -156,8 +156,12 @@ export const AboutView: React.FC = () => {
               <div className="lg:col-span-5 flex justify-center">
                 <div className="relative rounded-2xl overflow-hidden shadow-xl border-4 border-amber-500/40 max-w-sm">
                   <img
-                    src={officialLogo}
+                    src={collegeLogo || officialLogo}
                     alt="Image of Christ Bible College Official Crest Seal"
+                    referrerPolicy="no-referrer"
+                    onError={e => {
+                      (e.currentTarget as HTMLImageElement).src = officialLogo;
+                    }}
                     className="w-full h-auto object-contain bg-white"
                   />
                   <div className="bg-[#0f2444] text-white p-3 text-center">
@@ -392,9 +396,10 @@ export const AboutView: React.FC = () => {
                   <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
                     <div className="w-28 h-28 rounded-full overflow-hidden border-3 border-amber-500 flex-shrink-0 shadow-md bg-white p-1">
                       <img
-                        src={member.photo || officialLogo}
+                        src={member.photo || collegeLogo || officialLogo}
+                        referrerPolicy="no-referrer"
                         onError={e => {
-                          (e.currentTarget as HTMLImageElement).src = officialLogo;
+                          (e.currentTarget as HTMLImageElement).src = collegeLogo || officialLogo;
                         }}
                         alt={member.name}
                         className="w-full h-full object-cover rounded-full"

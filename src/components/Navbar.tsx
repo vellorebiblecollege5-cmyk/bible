@@ -18,10 +18,10 @@ import {
   User
 } from 'lucide-react';
 
-import officialLogo from '../assets/images/icbc_official_logo_1790324060325.jpg';
+import officialLogo from '../assets/images/icbc_vellore_official_logo_1790438854633.jpg';
 
 export const Navbar: React.FC = () => {
-  const { activePage, setActivePage, loginMode, setLoginMode, isStudentLoggedIn, studentProfile, currentUser } = useCollege();
+  const { activePage, setActivePage, loginMode, setLoginMode, isStudentLoggedIn, studentProfile, currentUser, collegeLogo } = useCollege();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aboutDropdown, setAboutDropdown] = useState(false);
   const [coursesDropdown, setCoursesDropdown] = useState(false);
@@ -133,8 +133,12 @@ export const Navbar: React.FC = () => {
             {/* Real Crest Seal */}
             <div className="w-13 h-13 rounded-full overflow-hidden p-0.5 border-2 border-amber-500/80 shadow-sm group-hover:scale-105 transition-transform flex-shrink-0 bg-white">
               <img
-                src={officialLogo}
-                alt="Image of Christ Bible College Crest"
+                src={collegeLogo || officialLogo}
+                alt="Image of Christ Bible College Vellore Official Logo"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = officialLogo;
+                }}
                 className="w-full h-full object-cover rounded-full"
               />
             </div>

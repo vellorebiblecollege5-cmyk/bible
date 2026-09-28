@@ -2,9 +2,10 @@ import React from 'react';
 import { useCollege } from '../context/CollegeContext';
 import { X, Download, FileText, CheckCircle2, ShieldCheck, Printer } from 'lucide-react';
 import { COLLEGE_INFO } from '../data/collegeData';
+import officialLogo from '../assets/images/icbc_vellore_official_logo_1790438854633.jpg';
 
 export const DocumentModal: React.FC = () => {
-  const { activeDocumentPreview, setActiveDocumentPreview } = useCollege();
+  const { activeDocumentPreview, setActiveDocumentPreview, collegeLogo } = useCollege();
 
   if (!activeDocumentPreview) return null;
 
@@ -38,8 +39,16 @@ export const DocumentModal: React.FC = () => {
         <div className="p-6 md:p-8 overflow-y-auto bg-stone-50 font-serif text-slate-800 space-y-6">
           {/* Institutional Letterhead */}
           <div className="text-center pb-6 border-b border-stone-300">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-900 text-amber-400 font-bold mb-2 shadow-sm">
-              ✝
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full overflow-hidden border-2 border-amber-500 bg-white mb-2 shadow-sm">
+              <img
+                src={collegeLogo || officialLogo}
+                alt="Image of Christ Bible College Vellore Logo"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = officialLogo;
+                }}
+                className="w-full h-full object-cover"
+              />
             </div>
             <h2 className="text-xl font-cinzel font-bold text-slate-900 tracking-wide uppercase">
               {COLLEGE_INFO.name}

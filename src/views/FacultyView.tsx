@@ -12,10 +12,10 @@ import {
   Shield,
   Sparkles
 } from 'lucide-react';
-import officialLogo from '../assets/images/icbc_official_logo_1790324060325.jpg';
+import officialLogo from '../assets/images/icbc_vellore_official_logo_1790438854633.jpg';
 
 export const FacultyView: React.FC = () => {
-  const { faculty } = useCollege();
+  const { faculty, collegeLogo } = useCollege();
   const [selectedFaculty, setSelectedFaculty] = useState<FacultyMember | null>(null);
   const principal = faculty.find(f => f.id === 'fac-1') || faculty[0] || INITIAL_FACULTY[0];
 
@@ -47,9 +47,10 @@ export const FacultyView: React.FC = () => {
               {/* Faculty Photo or Official College Seal */}
               <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-amber-500 shadow-md bg-white p-1 flex-shrink-0">
                 <img
-                  src={member.photo || officialLogo}
+                  src={member.photo || collegeLogo || officialLogo}
+                  referrerPolicy="no-referrer"
                   onError={e => {
-                    (e.currentTarget as HTMLImageElement).src = officialLogo;
+                    (e.currentTarget as HTMLImageElement).src = collegeLogo || officialLogo;
                   }}
                   alt={member.name}
                   className="w-full h-full object-cover rounded-full"

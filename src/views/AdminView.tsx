@@ -25,7 +25,7 @@ import {
   ALL_STORAGE_BUCKETS
 } from '../lib/supabase';
 import { INITIAL_FACULTY } from '../data/collegeData';
-import officialLogo from '../assets/images/icbc_official_logo_1790324060325.jpg';
+import officialLogo from '../assets/images/icbc_vellore_official_logo_1790438854633.jpg';
 import {
   Shield,
   Lock,
@@ -139,7 +139,9 @@ export const AdminView: React.FC = () => {
     supabaseStatus,
     updateSupabaseCredentials,
     syncWithSupabase,
-    seedAllDataToSupabase
+    seedAllDataToSupabase,
+    collegeLogo,
+    updateCollegeLogo
   } = useCollege();
 
   // Theme & Liquid Cooling Controls
@@ -1420,24 +1422,62 @@ export const AdminView: React.FC = () => {
       <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white py-10 border-b border-amber-600/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center space-x-3">
-                <span className="text-xs uppercase tracking-widest text-amber-400 font-bold">
-                  Administrative Control Panel
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-400/30">
-                  {currentUser?.role.replace('_', ' ').toUpperCase()}
-                </span>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-amber-400 bg-white p-0.5 shrink-0 shadow-lg">
+                <img
+                  src={collegeLogo || officialLogo}
+                  alt="Image of Christ Bible College Vellore Logo"
+                  referrerPolicy="no-referrer"
+                  onError={e => {
+                    (e.currentTarget as HTMLImageElement).src = officialLogo;
+                  }}
+                  className="w-full h-full object-cover rounded-full"
+                />
               </div>
-              <h1 className="font-cinzel text-2xl sm:text-3xl font-extrabold tracking-tight">
-                College Operations & Cloud DB Hub
-              </h1>
-              <p className="text-xs text-slate-300">
-                Logged in as <strong className="text-white">{currentUser?.fullName}</strong> ({currentUser?.email})
-              </p>
+              <div className="space-y-1">
+                <div className="flex items-center space-x-3">
+                  <span className="text-xs uppercase tracking-widest text-amber-400 font-bold">
+                    Administrative Control Panel
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                    {currentUser?.role.replace('_', ' ').toUpperCase()}
+                  </span>
+                </div>
+                <h1 className="font-cinzel text-2xl sm:text-3xl font-extrabold tracking-tight">
+                  College Operations & Cloud DB Hub
+                </h1>
+                <p className="text-xs text-slate-300">
+                  Logged in as <strong className="text-white">{currentUser?.fullName}</strong> ({currentUser?.email})
+                </p>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              {/* Upload / Change Official College Logo */}
+              <label className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-amber-300 border border-amber-400/40 text-xs font-extrabold flex items-center space-x-1.5 transition-all shadow cursor-pointer">
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>{isUploading ? 'Uploading...' : 'Change College Logo'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async e => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      setIsUploading(true);
+                      const res = await updateCollegeLogo(f);
+                      setIsUploading(false);
+                      if (res.success) {
+                        showToast('success', 'Official College Logo updated & synced across the website!');
+                      } else {
+                        showToast('error', res.error || 'Failed to update college logo');
+                      }
+                    }
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+
               {/* Quick Edit Principal (Pr. Christopher) Button */}
               <button
                 onClick={() => {
@@ -1889,9 +1929,10 @@ export const AdminView: React.FC = () => {
               <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
                 <div className="w-24 h-24 rounded-full overflow-hidden border-3 border-amber-400 bg-white p-1 shrink-0 shadow-lg">
                   <img
-                    src={principalProfile.photo || officialLogo}
+                    src={principalProfile.photo || collegeLogo || officialLogo}
+                    referrerPolicy="no-referrer"
                     onError={e => {
-                      (e.currentTarget as HTMLImageElement).src = officialLogo;
+                      (e.currentTarget as HTMLImageElement).src = collegeLogo || officialLogo;
                     }}
                     alt={principalProfile.name}
                     className="w-full h-full object-cover rounded-full"
@@ -1969,9 +2010,10 @@ export const AdminView: React.FC = () => {
                   <div className="space-y-4">
                     <div className="flex items-center space-x-4">
                       <img
-                        src={f.photo || officialLogo}
+                        src={f.photo || collegeLogo || officialLogo}
+                        referrerPolicy="no-referrer"
                         onError={e => {
-                          (e.currentTarget as HTMLImageElement).src = officialLogo;
+                          (e.currentTarget as HTMLImageElement).src = collegeLogo || officialLogo;
                         }}
                         alt={f.name}
                         className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-500/40 shadow-sm shrink-0 bg-white p-0.5"
@@ -4333,9 +4375,10 @@ export const AdminView: React.FC = () => {
               {/* Photo Preview & Upload */}
               <div className="flex flex-col sm:flex-row items-center gap-4 p-3.5 rounded-2xl bg-stone-50 border border-stone-200">
                 <img
-                  src={facPhoto || officialLogo}
+                  src={facPhoto || collegeLogo || officialLogo}
+                  referrerPolicy="no-referrer"
                   onError={e => {
-                    (e.currentTarget as HTMLImageElement).src = officialLogo;
+                    (e.currentTarget as HTMLImageElement).src = collegeLogo || officialLogo;
                   }}
                   alt={facName || 'Faculty'}
                   className="w-18 h-18 rounded-full object-cover border-2 border-amber-500 bg-white p-0.5 shrink-0 shadow"

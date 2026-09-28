@@ -30,6 +30,7 @@ import {
   INITIAL_APPLICATIONS,
   INITIAL_CONTACT_MESSAGES
 } from '../data/collegeData';
+import defaultCollegeLogo from '../assets/images/icbc_vellore_official_logo_1790438854633.jpg';
 import {
   getSupabaseClient,
   getSavedSupabaseConfig,
@@ -160,6 +161,9 @@ interface CollegeContextType {
   setSelectedCourseForApply: (courseId: string | null) => void;
   activeDocumentPreview: { title: string; type: string; content?: string } | null;
   setActiveDocumentPreview: (doc: { title: string; type: string; content?: string } | null) => void;
+  // Official College Logo (synced across cloud & browser)
+  collegeLogo: string;
+  updateCollegeLogo: (fileOrUrl: File | string) => Promise<{ success: boolean; url: string; error?: string }>;
   // Supabase Database Connection & Seeding (STEP 2 & 5)
   supabaseStatus: SupabaseSyncStatus;
   updateSupabaseCredentials: (url: string, key: string) => Promise<{ success: boolean; message: string }>;
@@ -184,7 +188,8 @@ const STORAGE_KEYS = {
   UPLOADED_FILES: 'icbc_uploaded_files_v2',
   AUTH_USER: 'icbc_auth_user_v2',
   STUDENT_AUTH: 'icbc_student_auth_v2',
-  DELETED_IDS: 'icbc_deleted_ids_v2'
+  DELETED_IDS: 'icbc_deleted_ids_v2',
+  COLLEGE_LOGO: 'icbc_college_logo_v2'
 };
 
 const safeSetLocalStorage = (key: string, value: string) => {
@@ -208,6 +213,29 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [loginMode, setLoginMode] = useState<'user' | 'admin'>('user');
   const [selectedCourseForApply, setSelectedCourseForApply] = useState<string | null>(null);
   const [activeDocumentPreview, setActiveDocumentPreview] = useState<{ title: string; type: string; content?: string } | null>(null);
+  const [collegeLogo, setCollegeLogo] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.COLLEGE_LOGO);
+      if (saved && (saved.startsWith('http') || saved.startsWith('data:') || saved.startsWith('/'))) {
+        return saved;
+      }
+    } catch {
+      // ignore
+    }
+    return defaultCollegeLogo;
+  });
+
+  useEffect(() => {
+    try {
+      const link = document.querySelector("link[rel~='icon']") as HTMLLinkElement | null;
+      if (link && collegeLogo) {
+        link.type = 'image/jpeg';
+        link.href = collegeLogo;
+      }
+    } catch {
+      // ignore favicon error
+    }
+  }, [collegeLogo]);
 
   // Supabase status state (Always connected via built-in Supabase Realtime Engine + Cloud)
   const initialConfig = getSavedSupabaseConfig();
@@ -369,7 +397,8 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     gallery,
     downloads,
     contactMessages,
-    uploadedFiles
+    uploadedFiles,
+    collegeLogo
   });
   liveStateRef.current = {
     courses,
@@ -383,11 +412,12 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     gallery,
     downloads,
     contactMessages,
-    uploadedFiles
+    uploadedFiles,
+    collegeLogo
   };
 
   // Helper to push updates to persistent Supabase cloud store (college_sync_state) & local server & broadcast to all open tabs
-  const pushToSupabaseBackend = async (payload: Record<string, any[]>) => {
+  const pushToSupabaseBackend = async (payload: Record<string, any>) => {
     const live = liveStateRef.current;
     const nextState = {
       courses: Array.isArray(payload.courses) ? payload.courses : live.courses,
@@ -402,6 +432,7 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       downloads: Array.isArray(payload.downloads) ? payload.downloads : live.downloads,
       contact_messages: Array.isArray(payload.contact_messages) ? payload.contact_messages : live.contactMessages,
       uploaded_files: Array.isArray(payload.uploaded_files) ? payload.uploaded_files : live.uploadedFiles,
+      college_logo: typeof payload.college_logo === 'string' && payload.college_logo ? payload.college_logo : live.collegeLogo,
       deleted_ids: Array.from(deletedIdsRef.current),
       updatedAt: new Date().toISOString()
     };
@@ -419,8 +450,13 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       gallery: nextState.gallery,
       downloads: nextState.downloads,
       contactMessages: nextState.contact_messages,
-      uploadedFiles: nextState.uploaded_files
+      uploadedFiles: nextState.uploaded_files,
+      collegeLogo: nextState.college_logo
     };
+
+    if (typeof payload.college_logo === 'string' && payload.college_logo) {
+      safeSetLocalStorage(STORAGE_KEYS.COLLEGE_LOGO, payload.college_logo);
+    }
 
     if (Array.isArray(payload.courses)) safeSetLocalStorage(STORAGE_KEYS.COURSES, JSON.stringify(payload.courses));
     if (Array.isArray(payload.faculty)) safeSetLocalStorage(STORAGE_KEYS.FACULTY, JSON.stringify(payload.faculty));
@@ -1239,6 +1275,12 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
 
+    if (typeof serverState.college_logo === 'string' && serverState.college_logo.trim()) {
+      setCollegeLogo(serverState.college_logo);
+      live.collegeLogo = serverState.college_logo;
+      safeSetLocalStorage(STORAGE_KEYS.COLLEGE_LOGO, serverState.college_logo);
+    }
+
     if (shouldPushExtras && Object.keys(toPush).length > 0) {
       pushToSupabaseBackend(toPush);
     }
@@ -1274,6 +1316,8 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
               f.name &&
               !f.name.startsWith('.') &&
               f.name !== 'verification-check.txt' &&
+              !f.name.startsWith('icbc_vellore_official_logo') &&
+              !f.name.startsWith('official_college_logo') &&
               /\.(jpe?g|png|webp|gif|svg)$/i.test(f.name)
           );
 
@@ -2619,6 +2663,52 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  const updateCollegeLogo = async (fileOrUrl: File | string): Promise<{ success: boolean; url: string; error?: string }> => {
+    try {
+      if (typeof fileOrUrl === 'string') {
+        const cleanUrl = fileOrUrl.trim() || defaultCollegeLogo;
+        setCollegeLogo(cleanUrl);
+        safeSetLocalStorage(STORAGE_KEYS.COLLEGE_LOGO, cleanUrl);
+        await pushToSupabaseBackend({ college_logo: cleanUrl });
+        return { success: true, url: cleanUrl };
+      }
+
+      const client = getSupabaseClient();
+      const cfg = getSavedSupabaseConfig();
+      if (client && isExternalSupabaseUrl(cfg.url)) {
+        const ext = fileOrUrl.name.split('.').pop() || 'jpg';
+        const fileName = `official_college_logo_${Date.now()}.${ext}`;
+        const { error: upErr } = await client.storage
+          .from('gallery')
+          .upload(fileName, fileOrUrl, { cacheControl: '3600', upsert: true });
+
+        if (!upErr) {
+          const { data: pubData } = client.storage.from('gallery').getPublicUrl(fileName);
+          if (pubData?.publicUrl) {
+            setCollegeLogo(pubData.publicUrl);
+            safeSetLocalStorage(STORAGE_KEYS.COLLEGE_LOGO, pubData.publicUrl);
+            await pushToSupabaseBackend({ college_logo: pubData.publicUrl });
+            return { success: true, url: pubData.publicUrl };
+          }
+        }
+      }
+
+      // Fallback to base64 data URL if offline
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Failed to read logo file'));
+        reader.readAsDataURL(fileOrUrl);
+      });
+      setCollegeLogo(dataUrl);
+      safeSetLocalStorage(STORAGE_KEYS.COLLEGE_LOGO, dataUrl);
+      await pushToSupabaseBackend({ college_logo: dataUrl });
+      return { success: true, url: dataUrl };
+    } catch (err: any) {
+      return { success: false, url: collegeLogo, error: err?.message || 'Logo upload failed' };
+    }
+  };
+
   return (
     <CollegeContext.Provider
       value={{
@@ -2694,6 +2784,8 @@ export const CollegeProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setSelectedCourseForApply,
         activeDocumentPreview,
         setActiveDocumentPreview,
+        collegeLogo,
+        updateCollegeLogo,
         supabaseStatus,
         updateSupabaseCredentials,
         syncWithSupabase,

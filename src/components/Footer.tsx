@@ -14,10 +14,10 @@ import {
   BookOpen
 } from 'lucide-react';
 
-import officialLogo from '../assets/images/icbc_official_logo_1790324060325.jpg';
+import officialLogo from '../assets/images/icbc_vellore_official_logo_1790438854633.jpg';
 
 export const Footer: React.FC = () => {
-  const { setActivePage } = useCollege();
+  const { setActivePage, collegeLogo } = useCollege();
   const [subscribedEmail, setSubscribedEmail] = useState('');
   const [subscribedSuccess, setSubscribedSuccess] = useState(false);
 
@@ -65,8 +65,12 @@ export const Footer: React.FC = () => {
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 rounded-full overflow-hidden border border-amber-400/80 bg-white flex-shrink-0 shadow">
                 <img
-                  src={officialLogo}
-                  alt="ICBC Official Seal"
+                  src={collegeLogo || officialLogo}
+                  alt="Image of Christ Bible College Vellore Official Seal"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = officialLogo;
+                  }}
                   className="w-full h-full object-cover"
                 />
               </div>
